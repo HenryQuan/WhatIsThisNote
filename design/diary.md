@@ -12,3 +12,6 @@ I want to do this app slowly and keep adding more features like scales and chord
 
 ## 4/08/2019
 My uni project is done. I will focus on my other assignments and also start doing this one.
+
+## 30/08/2019
+I haven't played piano for a while. Maybe it it time to play it again. 
