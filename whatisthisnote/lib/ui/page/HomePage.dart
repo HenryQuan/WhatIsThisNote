@@ -17,18 +17,34 @@ class _HomePageState extends State<HomePage> {
         title: Text('What is this note?')
       ),
       body: SafeArea(
-        child: Column(
-          children: renderAllNodes(context)
+        child: Stack(
+          children: <Widget>[
+            Column(
+              children: renderAllNodes(),
+            ),
+            Center(
+              child: FractionallySizedBox(
+                heightFactor: 1 / 52,
+                child: Container(
+                  color: Colors.red,
+                ),
+              ),
+            )
+          ],
         ),
       )
     );
   }
 
-  List<Widget> renderAllNodes(BuildContext context) {
+  List<Widget> renderAllNodes() {
     return List.generate(52, (_) => _).map((e) {
       return Flexible(
         flex: 1,
-        child: Container(color: e % 2 != 0 ? Colors.white : Colors.blue),
+        child: DragTarget(
+          builder: (BuildContext context, List<dynamic> candidateData, List<dynamic> rejectedData) { 
+            return Container(color: e % 2 != 0 ? Colors.white : Colors.blue);
+          },
+        ),
       );
     }).toList();
   }
