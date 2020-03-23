@@ -10,29 +10,35 @@ class HomePage extends StatefulWidget {
 
 
 class _HomePageState extends State<HomePage> {
+  Offset offset = Offset.zero;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('What is this note?')
       ),
-      body: SafeArea(
-        child: Stack(
-          children: <Widget>[
-            Column(
-              children: renderAllNodes(),
+      body: Stack(
+        children: <Widget>[
+          Positioned(
+            left: offset.dx,
+            top: offset.dy,
+            child: GestureDetector(
+              onPanUpdate: (details) {
+                final newDx = offset.dx + details.delta.dx;
+                final newDy = offset.dy + details.delta.dy;
+                print('$newDx $newDy\n');
+                if (newDy >= 0 && newDx >= 0) {
+                  setState(() {
+                    offset = Offset(newDx, newDy);
+                  });
+                }
+              },
+              child: Container(width: 100, height: 100, color: Colors.blue),
             ),
-            Center(
-              child: FractionallySizedBox(
-                heightFactor: 1 / 52,
-                child: Container(
-                  color: Colors.red,
-                ),
-              ),
-            )
-          ],
-        ),
-      )
+          ),
+        ],
+      ),
     );
   }
 
