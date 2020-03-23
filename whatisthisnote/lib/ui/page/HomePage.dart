@@ -14,9 +14,22 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('HomePage')
+        title: Text('What is this note?')
       ),
-      body: Container(),
+      body: SafeArea(
+        child: Column(
+          children: renderAllNodes(context)
+        ),
+      )
     );
+  }
+
+  List<Widget> renderAllNodes(BuildContext context) {
+    return List.generate(52, (_) => _).map((e) {
+      return Flexible(
+        flex: 1,
+        child: Container(color: e % 2 != 0 ? Colors.white : Colors.blue),
+      );
+    }).toList();
   }
 }
