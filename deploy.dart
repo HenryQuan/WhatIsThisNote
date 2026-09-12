@@ -11,6 +11,12 @@
 /// The first deploy also needs the custom domain attached once in the
 /// Cloudflare dashboard (Workers & Pages -> project -> Custom domains).
 /// After that, every run of this script publishes straight to the domain.
+///
+/// Every build clears Flutter's incremental web build cache first. A stale
+/// generated web plugin registrant silently omits newly added web plugins
+/// (for example `shared_preferences` on web, which makes the app forget its
+/// preferences), so the cache is dropped to force the registrant to be
+/// regenerated.
 library;
 
 import 'dart:io';
@@ -37,6 +43,8 @@ Future<void> main(List<String> args) async {
   );
 
   if (!options.skipBuild) {
+    _clearWebBuildCache(appDir);
+
     stdout.writeln('== flutter build web --release');
     final code = await run('flutter', [
       'build',
@@ -70,6 +78,42 @@ Future<void> main(List<String> args) async {
     'dashboard: Workers & Pages -> ${options.project} -> Custom domains -> '
     '${options.domain}',
   );
+}
+
+/// Removes the parts of Flutter's incremental build cache that decide which
+/// web plugins get registered.
+///
+/// The generated `web_plugin_registrant.dart` can go stale when a dependency
+/// that brings a new web plugin is added, so the deployed bundle never calls
+/// that plugin's `registerWith`. The failure is silent: `shared_preferences`
+/// on web falls back to a method channel with no implementation, so reads
+/// return defaults and writes are dropped. Deleting the cache and the plugin
+/// list forces both to be regenerated on the next build.
+///
+/// `flutter clean` is not used because on Windows it can leave `.dart_tool`
+/// behind when a file is locked; removing the directories directly is
+/// reliable and far cheaper than a full clean.
+void _clearWebBuildCache(Directory appDir) {
+  final separator = Platform.pathSeparator;
+  final targets = [
+    Directory('${appDir.path}${separator}.dart_tool${separator}flutter_build'),
+    File('${appDir.path}${separator}.flutter-plugins-dependencies'),
+  ];
+  for (final target in targets) {
+    if (!target.existsSync()) continue;
+    stdout.writeln('== clear stale build cache: ${target.path}');
+    try {
+      target.deleteSync(recursive: true);
+    } on FileSystemException catch (error) {
+      stderr.writeln(
+        'Could not clear ${target.path}: ${error.message}\n'
+        'A running Flutter or IDE process is probably holding it. Stop that '
+        'process and retry: a stale plugin registrant would make the deployed '
+        'site ignore shared_preferences on web.',
+      );
+      exit(1);
+    }
+  }
 }
 
 class _Options {
