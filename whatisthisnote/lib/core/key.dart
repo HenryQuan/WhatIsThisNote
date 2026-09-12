@@ -47,6 +47,23 @@ class MusicalKey {
   /// Number of accidentals, always non-negative.
   int get signatureCount => accidentals.abs();
 
+  /// The tonic letter, parsed from [tonic].
+  NoteLetter get tonicLetter =>
+      NoteLetter.values.firstWhere((letter) => letter.name == tonic[0]);
+
+  /// The accidental of the tonic, parsed from [tonic].
+  Accidental get tonicAccidental {
+    if (tonic.contains('\u266F')) return Accidental.sharp;
+    if (tonic.contains('\u266D')) return Accidental.flat;
+    return Accidental.natural;
+  }
+
+  /// Pitch class of the tonic, 0 == C.
+  int get tonicPitchClass {
+    final pitchClass = tonicLetter.semitone + tonicAccidental.offset;
+    return (pitchClass % 12 + 12) % 12;
+  }
+
   /// Description of the signature, e.g. `2 sharps`.
   String get signatureLabel {
     if (accidentals == 0) return 'no sharps or flats';

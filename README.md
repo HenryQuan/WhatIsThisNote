@@ -21,6 +21,14 @@ lines.
 - [x] Responsive layout (line spacing scales with the screen)
 - [x] Light and dark themes
 
+### Add-ons (off by default)
+
+- [x] Scale highlight: major, natural/harmonic/melodic minor, major/minor
+      pentatonic and blues, tinted on the piano keyboard with the note's scale
+      degree
+- [ ] Chords and harmony lab (triads, inversions, Roman numerals, progressions)
+- [ ] Guided theory path (step-by-step lessons)
+
 ### Pro features
 
 - [ ] Quiz (time attack with levels)

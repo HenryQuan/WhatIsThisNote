@@ -4,6 +4,7 @@ import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/note.dart';
+import 'package:whatisthisnote/core/scale.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 
 void main() {
@@ -221,6 +222,68 @@ void main() {
     test('C major and A minor have empty signatures', () {
       expect(cMajor.signatureFor(Clef.treble), isEmpty);
       expect(kMinorKeys.first.signatureFor(Clef.bass), isEmpty);
+    });
+  });
+
+  group('Scale', () {
+    test('parses the tonic pitch class of a key', () {
+      expect(kMajorKeys[0].tonicPitchClass, 0); // C
+      MusicalKey g = MusicalKey('G', KeyMode.major, 1);
+      expect(g.tonicPitchClass, 7);
+      MusicalKey fSharp = MusicalKey('F\u266F', KeyMode.major, 6);
+      expect(fSharp.tonicPitchClass, 6);
+      MusicalKey bFlat = MusicalKey('B\u266D', KeyMode.major, -2);
+      expect(bFlat.tonicPitchClass, 10);
+    });
+
+    test('major and minor scales use the diatonic set', () {
+      const cMajor = Scale('C', 0, ScaleType.major);
+      expect(cMajor.pitchClasses, {0, 2, 4, 5, 7, 9, 11});
+
+      const aMinor = Scale('A', 9, ScaleType.naturalMinor);
+      expect(aMinor.pitchClasses, {9, 11, 0, 2, 4, 5, 7});
+    });
+
+    test('pentatonic and blues sets include their characteristic notes', () {
+      const cMajorPent = Scale('C', 0, ScaleType.majorPentatonic);
+      expect(cMajorPent.pitchClasses, {0, 2, 4, 7, 9});
+
+      const cMinorPent = Scale('C', 0, ScaleType.minorPentatonic);
+      expect(cMinorPent.pitchClasses, {0, 3, 5, 7, 10});
+
+      const cBlues = Scale('C', 0, ScaleType.blues);
+      expect(cBlues.pitchClasses, {0, 3, 5, 6, 7, 10});
+    });
+
+    test('transposes to any tonic', () {
+      const gBlues = Scale('G', 7, ScaleType.blues);
+      expect(gBlues.pitchClasses, {7, 10, 0, 1, 2, 5});
+      expect(gBlues.contains(Note.fromLetter(NoteLetter.g, 4).midi), isTrue);
+      expect(gBlues.contains(Note.fromLetter(NoteLetter.c, 5).midi), isTrue);
+      expect(gBlues.contains(Note.fromLetter(NoteLetter.b, 4).midi), isFalse);
+    });
+
+    test('reports scale degrees and notes outside the scale', () {
+      const cBlues = Scale('C', 0, ScaleType.blues);
+      final eFlat = Note.fromLetter(NoteLetter.e, 4)
+          .withAccidental(Accidental.flat);
+      expect(cBlues.degreeLabelFor(eFlat.midi), '\u266D3');
+      expect(cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.f, 4).midi),
+          '4');
+      expect(cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.f, 4)
+          .withAccidental(Accidental.sharp)
+          .midi), '\u266D5');
+      expect(cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.d, 4).midi),
+          isNull);
+      expect(cBlues.label, 'C Blues');
+    });
+
+    test('harmonic and melodic minor differ on the sixth and seventh', () {
+      const harmonic = Scale('C', 0, ScaleType.harmonicMinor);
+      expect(harmonic.pitchClasses, {0, 2, 3, 5, 7, 8, 11});
+
+      const melodic = Scale('C', 0, ScaleType.melodicMinor);
+      expect(melodic.pitchClasses, {0, 2, 3, 5, 7, 9, 11});
     });
   });
 }

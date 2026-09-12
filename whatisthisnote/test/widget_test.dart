@@ -92,6 +92,50 @@ void main() {
     );
   });
 
+  testWidgets('scale highlight is off by default and can be enabled',
+      (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('scale-label'))).data,
+      'Highlight: Off',
+    );
+    expect(
+      tester
+          .widget<PianoKeyboard>(find.byType(PianoKeyboard))
+          .highlightPitchClasses,
+      isNull,
+    );
+
+    await tester.tap(find.byKey(const Key('scale-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Blues').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('scale-label'))).data,
+      'Highlight: Blues',
+    );
+    expect(
+      tester
+          .widget<PianoKeyboard>(find.byType(PianoKeyboard))
+          .highlightPitchClasses,
+      {0, 3, 5, 6, 7, 10},
+    );
+    // B4 is outside the C blues scale.
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-degree'))).data,
+      '\u2013',
+    );
+
+    await tester.tap(find.byTooltip('Higher')); // C5 is the tonic.
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-degree'))).data,
+      '1',
+    );
+  });
+
   testWidgets('the staff size does not jump when controls change',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 800));

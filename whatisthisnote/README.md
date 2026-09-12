@@ -2,7 +2,8 @@
 
 The Flutter app for [WhatIsThisNote](../README.md). Drag a note around the
 staff to learn to read music; ledger lines, key signatures, note names and a
-mini piano keyboard update live.
+mini piano keyboard update live. Optional add-ons (off by default) highlight
+scales such as pentatonic and blues.
 
 ## Run
 

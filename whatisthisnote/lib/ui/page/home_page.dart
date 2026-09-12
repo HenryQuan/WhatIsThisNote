@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../core/clef.dart';
 import '../../core/key.dart';
+import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
 import '../widgets/piano_keyboard.dart';
 import '../widgets/staff_view.dart';
 
 /// The main screen: an interactive staff plus controls for the clef, the key,
-/// the note position and the theme.
+/// an optional scale highlight, the note position and the theme.
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
@@ -26,6 +27,9 @@ class _HomePageState extends State<HomePage> {
   Clef _clef = Clef.treble;
   MusicalKey _key = kMajorKeys.first;
 
+  /// Optional scale highlight (an add-on), off by default.
+  ScaleType? _scaleType;
+
   /// Middle line of the treble staff (B4).
   int _step = 4;
 
@@ -35,6 +39,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final scale = _scaleType == null
+        ? null
+        : Scale(_key.tonic, _key.tonicPitchClass, _scaleType!);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('What is this note?'),
@@ -87,9 +95,11 @@ class _HomePageState extends State<HomePage> {
               key: const Key('controls'),
               clef: _clef,
               keySignature: _key,
+              scale: scale,
               step: _step,
               onClefChanged: (clef) => setState(() => _clef = clef),
               onKeyChanged: (key) => setState(() => _key = key),
+              onScaleTypeChanged: (type) => setState(() => _scaleType = type),
               onStepChanged: _setStep,
             ),
           ],
@@ -115,23 +125,37 @@ class _Controls extends StatelessWidget {
     super.key,
     required this.clef,
     required this.keySignature,
+    required this.scale,
     required this.step,
     required this.onClefChanged,
     required this.onKeyChanged,
+    required this.onScaleTypeChanged,
     required this.onStepChanged,
   });
 
   final Clef clef;
   final MusicalKey keySignature;
+  final Scale? scale;
   final int step;
   final ValueChanged<Clef> onClefChanged;
   final ValueChanged<MusicalKey> onKeyChanged;
+  final ValueChanged<ScaleType?> onScaleTypeChanged;
   final ValueChanged<int> onStepChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final note = keySignature.applyTo(clef.noteAt(step));
+
+    final scaleDegree = scale?.degreeLabelFor(note.midi);
+    final inScale = scaleDegree != null;
+    final badgeColor = scale == null || inScale
+        ? theme.colorScheme.primaryContainer
+        : theme.colorScheme.surfaceContainerHighest;
+    final badgeTextColor = scale == null || inScale
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+    final badgeLabel = scale == null ? '${note.degree}' : (scaleDegree ?? '–');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -182,14 +206,14 @@ class _Controls extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.primaryContainer,
+                            color: badgeColor,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            '${note.degree}',
+                            badgeLabel,
                             key: const Key('note-degree'),
                             style: theme.textTheme.titleMedium?.copyWith(
-                              color: theme.colorScheme.onPrimaryContainer,
+                              color: badgeTextColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -197,7 +221,11 @@ class _Controls extends StatelessWidget {
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            'numbered notation (1 = Do … 8 = Do)',
+                            scale == null
+                                ? 'numbered notation (1 = Do … 8 = Do)'
+                                : '${scale!.label} · '
+                                    '${inScale ? 'degree $scaleDegree' : 'outside scale'}',
+                            key: const Key('note-scale-caption'),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -234,6 +262,7 @@ class _Controls extends StatelessWidget {
           PianoKeyboard(
             midi: note.midi,
             label: note.pitchName,
+            highlightPitchClasses: scale?.pitchClasses,
           ),
           const SizedBox(height: 12),
           SegmentedButton<Clef>(
@@ -250,6 +279,8 @@ class _Controls extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _KeySelector(value: keySignature, onChanged: onKeyChanged),
+          const SizedBox(height: 8),
+          _ScaleSelector(value: scale?.type, onChanged: onScaleTypeChanged),
         ],
       ),
     );
@@ -316,6 +347,62 @@ class _KeySelector extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ScaleSelector extends StatelessWidget {
+  const _ScaleSelector({required this.value, required this.onChanged});
+
+  final ScaleType? value;
+  final ValueChanged<ScaleType?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<_ScaleOption>(
+      tooltip: 'Scale highlight',
+      onSelected: (option) => onChanged(option.type),
+      itemBuilder: (context) => [
+        const PopupMenuItem<_ScaleOption>(
+          value: _ScaleOption(null),
+          child: Text('Off'),
+        ),
+        const PopupMenuDivider(),
+        for (final type in ScaleType.values)
+          PopupMenuItem<_ScaleOption>(
+            value: _ScaleOption(type),
+            child: Text(type.label),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.highlight, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Highlight: ${value?.label ?? 'Off'}',
+                key: const Key('scale-label'),
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScaleOption {
+  const _ScaleOption(this.type);
+
+  final ScaleType? type;
 }
 
 class _MenuHeader extends StatelessWidget {
