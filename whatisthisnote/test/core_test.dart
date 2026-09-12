@@ -169,6 +169,20 @@ void main() {
       }
     });
 
+    test('describes the notes altered by the signature', () {
+      expect(cMajor.signatureNotes, '');
+      expect(gMajor.signatureNotes, 'F\u266F');
+      expect(fMajor.signatureNotes, 'B\u266D');
+      expect(
+        MusicalKey('D', KeyMode.major, 2).signatureNotes,
+        'F\u266F, C\u266F',
+      );
+      expect(
+        MusicalKey('B\u266D', KeyMode.major, -2).signatureNotes,
+        'B\u266D, E\u266D',
+      );
+    });
+
     test('flat keys alter letters in the order B E A D G C F', () {
       expect(fMajor.accidentalFor(NoteLetter.b), Accidental.flat);
       expect(fMajor.accidentalFor(NoteLetter.e), Accidental.natural);

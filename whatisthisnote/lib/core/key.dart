@@ -72,6 +72,18 @@ class MusicalKey {
     return '$count $name${count == 1 ? '' : 's'}';
   }
 
+  /// The note names altered by this signature, in writing order, e.g.
+  /// `F♯, C♯` for D major. Empty for C major / A minor.
+  String get signatureNotes {
+    if (accidentals == 0) return '';
+    final order = accidentals > 0 ? sharpOrder : flatOrder;
+    final accidental = accidentals > 0 ? Accidental.sharp : Accidental.flat;
+    return order
+        .take(signatureCount)
+        .map((letter) => '${letter.name}${accidental.text}')
+        .join(', ');
+  }
+
   /// The accidental a written [letter] takes inside this key.
   Accidental accidentalFor(NoteLetter letter) {
     if (accidentals > 0) {

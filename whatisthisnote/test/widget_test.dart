@@ -83,6 +83,17 @@ void main() {
     );
   });
 
+  testWidgets('key menu shows the sharps or flats of each key', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byKey(const Key('key-label')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('no sharps or flats'), findsWidgets);
+    expect(find.text('1 sharp \u00B7 F\u266F'), findsWidgets);
+    expect(find.text('2 sharps \u00B7 F\u266F, C\u266F'), findsWidgets);
+  });
+
   testWidgets('scale highlight is off by default and can be enabled', (
     tester,
   ) async {

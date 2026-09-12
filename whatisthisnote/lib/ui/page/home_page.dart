@@ -690,7 +690,11 @@ class _KeySelector extends StatelessWidget {
           child: _MenuHeader('Major'),
         ),
         for (final key in kMajorKeys)
-          PopupMenuItem<MusicalKey>(value: key, child: Text(key.label)),
+          PopupMenuItem<MusicalKey>(
+            value: key,
+            height: 64,
+            child: _KeyMenuEntry(musicalKey: key),
+          ),
         const PopupMenuDivider(),
         const PopupMenuItem<MusicalKey>(
           enabled: false,
@@ -698,7 +702,11 @@ class _KeySelector extends StatelessWidget {
           child: _MenuHeader('Minor'),
         ),
         for (final key in kMinorKeys)
-          PopupMenuItem<MusicalKey>(value: key, child: Text(key.label)),
+          PopupMenuItem<MusicalKey>(
+            value: key,
+            height: 64,
+            child: _KeyMenuEntry(musicalKey: key),
+          ),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -996,6 +1004,34 @@ class _ChordReadout extends StatelessWidget {
               color: scheme.onSurfaceVariant,
             ),
             overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _KeyMenuEntry extends StatelessWidget {
+  const _KeyMenuEntry({required this.musicalKey});
+
+  final MusicalKey musicalKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final notes = musicalKey.signatureNotes;
+    final detail = notes.isEmpty
+        ? musicalKey.signatureLabel
+        : '${musicalKey.signatureLabel} \u00B7 $notes';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(musicalKey.label),
+        Text(
+          detail,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
       ],
