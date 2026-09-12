@@ -3,6 +3,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/audio/note_player.dart';
+import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/display_preferences.dart';
 import 'package:whatisthisnote/core/display_preferences_store.dart';
@@ -567,6 +568,114 @@ void main() {
     expect(frequencies[1], lessThan(frequencies[2]));
   });
 
+  testWidgets('the highlight play button plays the scale note by note', (
+    tester,
+  ) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+
+    await tester.tap(find.byKey(const Key('scale-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Major').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('play-highlight')));
+    await tester.pump();
+
+    // The C major scale, ascending C4 to B4 and closing on C5.
+    expect(player.played, hasLength(1));
+    expect(player.played.first.single, closeTo(261.63, 0.01));
+    final firstPiano = tester.widget<PianoKeyboard>(find.byType(PianoKeyboard));
+    expect(firstPiano.playingPitchClass, 0);
+    expect(firstPiano.playingUpperOctave, isFalse);
+
+    for (var i = 0; i < 7; i++) {
+      await tester.pump(const Duration(milliseconds: 450));
+    }
+    expect(player.played, hasLength(8));
+    expect(player.played.last.single, closeTo(523.25, 0.01)); // C5
+    final lastPiano = tester.widget<PianoKeyboard>(find.byType(PianoKeyboard));
+    expect(lastPiano.playingPitchClass, 0);
+    expect(lastPiano.playingUpperOctave, isTrue);
+
+    // The sequence ends on its own and does not loop.
+    await tester.pump(const Duration(seconds: 2));
+    expect(player.played, hasLength(8));
+    expect(
+      tester
+          .widget<PianoKeyboard>(find.byType(PianoKeyboard))
+          .playingPitchClass,
+      isNull,
+    );
+  });
+
+  testWidgets('the progression play button plays the chords in order', (
+    tester,
+  ) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Triads').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('progression-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(kProgressions.first.name).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('play-progression')));
+    await tester.pump();
+
+    // The pop progression opens on I: the note moves to C5 and C E G sounds.
+    expect(player.played, hasLength(1));
+    expect(player.played.single, hasLength(3));
+    expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'C5');
+    // The chip for the chord that is sounding is emphasised.
+    expect(
+      tester
+          .widget<ActionChip>(find.byKey(const Key('prog-0')))
+          .backgroundColor,
+      isNotNull,
+    );
+
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 450));
+    }
+    expect(player.played, hasLength(kProgressions.first.degrees.length));
+    expect(player.played.every((chord) => chord.length == 3), isTrue);
+    // When the sequence ends the emphasis is cleared.
+    expect(
+      tester
+          .widget<ActionChip>(find.byKey(const Key('prog-0')))
+          .backgroundColor,
+      isNull,
+    );
+  });
+
+  testWidgets('pressing the play button again stops the sequence', (
+    tester,
+  ) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+
+    await tester.tap(find.byKey(const Key('scale-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Major').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('play-highlight')));
+    await tester.pump();
+    expect(player.played, hasLength(1));
+
+    // The button becomes a stop control; pressing it halts the sequence.
+    await tester.tap(find.byKey(const Key('play-highlight')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(player.played, hasLength(1));
+  });
+
   testWidgets('display settings switch the naming system', (tester) async {
     await tester.pumpWidget(const WhatIsThisNoteApp());
 
@@ -906,7 +1015,7 @@ class _RecordingNotePlayer implements NotePlayer {
   final List<List<double>> played = [];
 
   @override
-  Future<void> play(Iterable<double> frequencies) async {
+  Future<void> play(Iterable<double> frequencies, {Duration? duration}) async {
     played.add(frequencies.toList(growable: false));
   }
 

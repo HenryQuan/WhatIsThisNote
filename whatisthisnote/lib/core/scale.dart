@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'accidental.dart';
 import 'note.dart';
 
@@ -122,6 +124,30 @@ class Scale {
   Set<int> get pitchClasses => {
     for (final degree in type.degrees) (tonicPitchClass + degree.semitone) % 12,
   };
+
+  /// The pitch class of each degree, in the order the degrees are defined.
+  List<int> get degreePitchClasses => [
+    for (final degree in type.degrees) (tonicPitchClass + degree.semitone) % 12,
+  ];
+
+  /// The frequency (in hertz) of each degree, in order and ascending from the
+  /// tonic in [octave] (middle C is C4, MIDI 60).
+  ///
+  /// When [includeOctave] is true the tonic one octave up is appended, which
+  /// completes the scale.
+  List<double> frequencies({int octave = 4, bool includeOctave = false}) {
+    double hz(int semitone) =>
+        (440.0 *
+                math.pow(
+                  2,
+                  (12 * (octave + 1) + tonicPitchClass + semitone - 69) / 12,
+                ))
+            .toDouble();
+    return [
+      for (final degree in type.degrees) hz(degree.semitone),
+      if (includeOctave) hz(12),
+    ];
+  }
 
   /// Whether the sounding [midi] note is in the scale.
   bool contains(int midi) => pitchClasses.contains(midi % 12);

@@ -230,11 +230,43 @@ class ChordProgression {
   final List<int> degrees;
 }
 
-/// A few progressions that sound good in the common major and minor moods.
+/// Progressions that sound good in the common major and minor moods.
+///
+/// Each entry lists scale degrees (1..7) of whatever seven-note scale is
+/// selected, so the same list reads as I V vi IV in a major key and i v VI iv
+/// in a minor one. Names with an explicit minor numeral mark progressions
+/// that only make musical sense in a minor mood.
 const List<ChordProgression> kProgressions = [
+  // Major moods.
   ChordProgression('Pop \u2013 I V vi IV', [1, 5, 6, 4]),
   ChordProgression('Doo-wop \u2013 I vi IV V', [1, 6, 4, 5]),
+  ChordProgression('Axis \u2013 vi IV I V', [6, 4, 1, 5]),
+  ChordProgression('Folk \u2013 I IV V', [1, 4, 5]),
+  ChordProgression('Rock \u2013 I IV V IV', [1, 4, 5, 4]),
+  ChordProgression('Anthem \u2013 I V IV I', [1, 5, 4, 1]),
+  ChordProgression('Singer \u2013 I iii IV V', [1, 3, 4, 5]),
+  ChordProgression('Pop \u2013 I IV vi V', [1, 4, 6, 5]),
+  ChordProgression('Ballad \u2013 I vi IV I', [1, 6, 4, 1]),
+  ChordProgression('Emo \u2013 I V vi iii', [1, 5, 6, 3]),
+  ChordProgression('Cadence \u2013 IV V I', [4, 5, 1]),
+  // Jazz and turnarounds.
   ChordProgression('Jazz \u2013 ii V I', [2, 5, 1]),
+  ChordProgression('Turnaround \u2013 I vi ii V', [1, 6, 2, 5]),
+  ChordProgression('Circle \u2013 vi ii V I', [6, 2, 5, 1]),
+  ChordProgression('Jazz \u2013 iii vi ii V', [3, 6, 2, 5]),
+  ChordProgression('Jazz \u2013 ii V I vi', [2, 5, 1, 6]),
+  // Minor moods (the flat numerals are how they read in a minor scale).
+  ChordProgression('Minor pop \u2013 i VI III VII', [1, 6, 3, 7]),
+  ChordProgression('Minor rock \u2013 i \u266DVII \u266DVI \u266DVII', [
+    1,
+    7,
+    6,
+    7,
+  ]),
+  ChordProgression('Minor \u2013 i iv v i', [1, 4, 5, 1]),
+  ChordProgression('Minor \u2013 i VI iv v', [1, 6, 4, 5]),
+  ChordProgression('Minor \u2013 i iv \u266DVII \u266DIII', [1, 4, 7, 3]),
+  ChordProgression('Andalusian \u2013 i \u266DVII \u266DVI V', [1, 7, 6, 5]),
   ChordProgression('Canon \u2013 I V vi iii IV I IV V', [
     1,
     5,
@@ -245,5 +277,4 @@ const List<ChordProgression> kProgressions = [
     4,
     5,
   ]),
-  ChordProgression('Andalusian \u2013 i \u266DVII \u266DVI V', [1, 7, 6, 5]),
 ];

@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 /// current note sits on a real keyboard. The key matching [midi] is
 /// highlighted, any key whose pitch class is in [highlightPitchClasses] is
 /// tinted (used for scale highlighting) and any key in [chordPitchClasses] is
-/// tinted (used for chord tones).
+/// tinted (used for chord tones). While a scale is played automatically,
+/// [playingPitchClass] marks the note that is currently sounding.
 class PianoKeyboard extends StatelessWidget {
   const PianoKeyboard({
     super.key,
@@ -13,6 +14,8 @@ class PianoKeyboard extends StatelessWidget {
     this.label,
     this.highlightPitchClasses,
     this.chordPitchClasses,
+    this.playingPitchClass,
+    this.playingUpperOctave = false,
     this.height = 54,
   });
 
@@ -28,6 +31,15 @@ class PianoKeyboard extends StatelessWidget {
   /// Pitch classes (0 == C) of the current chord, tinted a third colour.
   final Set<int>? chordPitchClasses;
 
+  /// Pitch class (0 == C) of the note that is currently sounding while a
+  /// sequence plays, or `null` when nothing is playing.
+  final int? playingPitchClass;
+
+  /// Whether the sounding note is the upper of the keyboard's two C keys.
+  /// The keyboard spans one octave (C to C), so the closing tonic of a scale
+  /// must light the second C rather than the first.
+  final bool playingUpperOctave;
+
   final double height;
 
   @override
@@ -42,12 +54,15 @@ class PianoKeyboard extends StatelessWidget {
           label: label,
           highlightPitchClasses: highlightPitchClasses,
           chordPitchClasses: chordPitchClasses,
+          playingPitchClass: playingPitchClass,
+          playingUpperOctave: playingUpperOctave,
           whiteColor: scheme.surfaceContainerLowest,
           blackColor: scheme.onSurface,
           borderColor: scheme.outlineVariant,
           highlightColor: scheme.primary,
           scaleColor: scheme.primaryContainer,
           chordColor: scheme.tertiary,
+          playingColor: scheme.secondary,
           onHighlightColor: scheme.onPrimary,
           highlightBlackColor: Color.alphaBlend(
             scheme.primary.withValues(alpha: 0.78),
@@ -59,6 +74,10 @@ class PianoKeyboard extends StatelessWidget {
           ),
           chordBlackColor: Color.alphaBlend(
             scheme.tertiary.withValues(alpha: 0.78),
+            scheme.onSurface,
+          ),
+          playingBlackColor: Color.alphaBlend(
+            scheme.secondary.withValues(alpha: 0.78),
             scheme.onSurface,
           ),
         ),
@@ -73,28 +92,35 @@ class _PianoKeyboardPainter extends CustomPainter {
     required this.label,
     required this.highlightPitchClasses,
     required this.chordPitchClasses,
+    required this.playingPitchClass,
+    required this.playingUpperOctave,
     required this.whiteColor,
     required this.blackColor,
     required this.borderColor,
     required this.highlightColor,
     required this.scaleColor,
     required this.chordColor,
+    required this.playingColor,
     required this.onHighlightColor,
     required this.highlightBlackColor,
     required this.scaleBlackColor,
     required this.chordBlackColor,
+    required this.playingBlackColor,
   });
 
   final int midi;
   final String? label;
   final Set<int>? highlightPitchClasses;
   final Set<int>? chordPitchClasses;
+  final int? playingPitchClass;
+  final bool playingUpperOctave;
   final Color whiteColor;
   final Color blackColor;
   final Color borderColor;
   final Color highlightColor;
   final Color scaleColor;
   final Color chordColor;
+  final Color playingColor;
   final Color onHighlightColor;
 
   /// Slightly different shades used for the note highlight and the scale tint
@@ -103,6 +129,7 @@ class _PianoKeyboardPainter extends CustomPainter {
   final Color highlightBlackColor;
   final Color scaleBlackColor;
   final Color chordBlackColor;
+  final Color playingBlackColor;
 
   /// Pitch classes of the black keys.
   static const Set<int> _blackPitchClasses = {1, 3, 6, 8, 10};
@@ -149,16 +176,20 @@ class _PianoKeyboardPainter extends CustomPainter {
         whiteWidth,
         size.height,
       ).deflate(0.5);
+      final whitePitchClass = _whitePitchClasses[i];
       final highlighted = !isBlack && i == whiteIndexOfHighlight;
-      final tinted =
-          highlightPitchClasses?.contains(_whitePitchClasses[i]) ?? false;
-      final inChord =
-          chordPitchClasses?.contains(_whitePitchClasses[i]) ?? false;
+      final tinted = highlightPitchClasses?.contains(whitePitchClass) ?? false;
+      final inChord = chordPitchClasses?.contains(whitePitchClass) ?? false;
+      final playing =
+          playingPitchClass == whitePitchClass &&
+          (whitePitchClass != 0 || (i == 7) == playingUpperOctave);
       final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(4));
       canvas.drawRRect(
         rrect,
         Paint()
-          ..color = highlighted
+          ..color = playing
+              ? playingColor
+              : highlighted
               ? highlightColor
               : inChord
               ? chordColor
@@ -182,11 +213,14 @@ class _PianoKeyboardPainter extends CustomPainter {
       final highlighted = isBlack && entry.key == pitchClass;
       final tinted = highlightPitchClasses?.contains(entry.key) ?? false;
       final inChord = chordPitchClasses?.contains(entry.key) ?? false;
+      final playing = playingPitchClass == entry.key;
       final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(3));
       canvas.drawRRect(
         rrect,
         Paint()
-          ..color = highlighted
+          ..color = playing
+              ? playingBlackColor
+              : highlighted
               ? highlightBlackColor
               : inChord
               ? chordBlackColor
@@ -227,15 +261,19 @@ class _PianoKeyboardPainter extends CustomPainter {
         old.label != label ||
         !setEquals(old.highlightPitchClasses, highlightPitchClasses) ||
         !setEquals(old.chordPitchClasses, chordPitchClasses) ||
+        old.playingPitchClass != playingPitchClass ||
+        old.playingUpperOctave != playingUpperOctave ||
         old.whiteColor != whiteColor ||
         old.blackColor != blackColor ||
         old.borderColor != borderColor ||
         old.highlightColor != highlightColor ||
         old.scaleColor != scaleColor ||
         old.chordColor != chordColor ||
+        old.playingColor != playingColor ||
         old.highlightBlackColor != highlightBlackColor ||
         old.scaleBlackColor != scaleBlackColor ||
         old.chordBlackColor != chordBlackColor ||
+        old.playingBlackColor != playingBlackColor ||
         old.onHighlightColor != onHighlightColor;
   }
 }

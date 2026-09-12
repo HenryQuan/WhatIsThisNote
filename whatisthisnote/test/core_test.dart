@@ -317,6 +317,26 @@ void main() {
       const melodic = Scale('C', 0, ScaleType.melodicMinor);
       expect(melodic.pitchClasses, {0, 2, 3, 5, 7, 9, 11});
     });
+
+    test('degrees have ascending frequencies from the tonic octave', () {
+      const cMajor = Scale('C', 0, ScaleType.major);
+      final frequencies = cMajor.frequencies();
+      expect(frequencies, hasLength(7));
+      expect(frequencies.first, closeTo(261.63, 0.01)); // C4
+      expect(frequencies.last, closeTo(493.88, 0.01)); // B4
+      for (var i = 1; i < frequencies.length; i++) {
+        expect(frequencies[i], greaterThan(frequencies[i - 1]));
+      }
+
+      final withOctave = cMajor.frequencies(includeOctave: true);
+      expect(withOctave, hasLength(8));
+      expect(withOctave.last, closeTo(523.25, 0.01)); // C5
+    });
+
+    test('degree pitch classes line up with the scale degrees', () {
+      const gBlues = Scale('G', 7, ScaleType.blues);
+      expect(gBlues.degreePitchClasses, [7, 10, 0, 1, 2, 5]);
+    });
   });
 
   group('Chord', () {
@@ -416,6 +436,18 @@ void main() {
     test('lists playable progressions', () {
       expect(kProgressions, isNotEmpty);
       expect(kProgressions.first.degrees, [1, 5, 6, 4]);
+    });
+
+    test('every progression builds diatonic chords in major and minor', () {
+      const cMajor = Scale('C', 0, ScaleType.major);
+      const aMinor = Scale('A', 9, ScaleType.naturalMinor);
+      for (final progression in kProgressions) {
+        for (final degree in progression.degrees) {
+          expect(progression.name, isNotEmpty);
+          expect(Chord.diatonic(cMajor, degree).romanNumeral, isNotEmpty);
+          expect(Chord.diatonic(aMinor, degree).romanNumeral, isNotEmpty);
+        }
+      }
     });
   });
 

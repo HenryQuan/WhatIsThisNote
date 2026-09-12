@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -14,6 +16,15 @@ import '../../core/staff_geometry.dart';
 import '../widgets/display_settings_sheet.dart';
 import '../widgets/piano_keyboard.dart';
 import '../widgets/staff_view.dart';
+
+/// The two kinds of note sequence that can be played automatically.
+enum _Playback { highlight, progression }
+
+/// How long each note of a sequence rings, and how long to wait before the
+/// next one starts. The gap is a little longer than the sound so the notes
+/// stay distinct.
+const Duration _sequenceNoteDuration = Duration(milliseconds: 340);
+const Duration _sequenceStepGap = Duration(milliseconds: 420);
 
 /// The main screen: an interactive staff plus controls for the clef, the key,
 /// an optional scale highlight, the note position and the theme.
@@ -80,6 +91,14 @@ class _HomePageState extends State<HomePage> {
   /// Width of the wide-layout controls rail, dragged by the user.
   double _sidebarWidth = 380;
 
+  /// The sequence currently playing automatically, if any, and which note of
+  /// it is sounding. [_playbackToken] invalidates in-flight timer callbacks
+  /// when a sequence is stopped or replaced.
+  _Playback? _playback;
+  int? _playbackIndex;
+  int _playbackToken = 0;
+  Timer? _playbackTimer;
+
   void _setStep(int step) {
     setState(() => _step = step.clamp(kMinStaffStep, kMaxStaffStep));
   }
@@ -96,15 +115,24 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _keyboardFocus.dispose();
+    _playbackTimer?.cancel();
+    _playbackToken++;
     _ownedPlayer?.dispose();
     super.dispose();
   }
 
   /// Plays whatever is currently shown, including the chord-lab voicing.
-  void _playCurrent() {
+  void _playCurrent({Duration? duration}) {
     final scale = _selectedScale;
     final note = _key.applyTo(_clef.noteAt(_step));
-    _playSound(note, _chordFor(_chordScale(scale), note));
+    _playSound(note, _chordFor(_chordScale(scale), note), duration: duration);
+  }
+
+  /// Plays the current note/chord and cancels any running sequence, used by
+  /// the play button and the space shortcut.
+  void _playNow() {
+    _stopSequence();
+    _playCurrent();
   }
 
   /// Whether the keyboard focus is on a button, so space/arrows should keep
@@ -122,29 +150,98 @@ class _HomePageState extends State<HomePage> {
     }
     if (_focusIsInteractive()) return KeyEventResult.ignored;
     if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _stopSequence();
       _setStep(_step + 1);
       return KeyEventResult.handled;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _stopSequence();
       _setStep(_step - 1);
       return KeyEventResult.handled;
     }
     if (event.logicalKey == LogicalKeyboardKey.space) {
-      _playCurrent();
+      _playNow();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
 
+  /// The frequencies for the written [note], or [chord]'s tones when the
+  /// chord lab is on, voiced from the current staff position.
+  List<double> _frequenciesFor(Note note, Chord? chord) {
+    if (chord == null) return <double>[note.frequency];
+    return <double>[
+      for (final step in chord.staffSteps(_step))
+        _key.applyTo(_clef.noteAt(step)).frequency,
+    ];
+  }
+
   /// Plays the written [note], or [chord]'s tones when the chord lab is on.
-  void _playSound(Note note, Chord? chord) {
-    final frequencies = chord == null
-        ? <double>[note.frequency]
-        : <double>[
-            for (final step in chord.staffSteps(_step))
-              _key.applyTo(_clef.noteAt(step)).frequency,
-          ];
-    _notePlayer.play(frequencies);
+  void _playSound(Note note, Chord? chord, {Duration? duration}) {
+    _notePlayer.play(_frequenciesFor(note, chord), duration: duration);
+  }
+
+  /// Stops any automatic playback and clears its highlight.
+  void _stopSequence() {
+    _playbackTimer?.cancel();
+    _playbackTimer = null;
+    _playbackToken++;
+    if (_playback != null || _playbackIndex != null) {
+      setState(() {
+        _playback = null;
+        _playbackIndex = null;
+      });
+    }
+  }
+
+  /// Starts [kind] from the top, or stops it when it is already playing.
+  void _toggleSequence(_Playback kind) {
+    if (_playback == kind) {
+      _stopSequence();
+      return;
+    }
+    final total = _sequenceLength(kind);
+    if (total == 0) return;
+    _stopSequence();
+    final token = _playbackToken;
+    setState(() {
+      _playback = kind;
+      _playbackIndex = 0;
+    });
+    _playSequenceStep(token, kind, 0);
+  }
+
+  /// How many steps [kind] plays. A scale gets one extra note so it ends on
+  /// the tonic an octave up.
+  int _sequenceLength(_Playback kind) => switch (kind) {
+    _Playback.highlight => (_scaleType?.degrees.length ?? 0) + 1,
+    _Playback.progression => _progression?.degrees.length ?? 0,
+  };
+
+  /// Plays one step of the running sequence and schedules the next.
+  void _playSequenceStep(int token, _Playback kind, int index) {
+    if (!mounted || token != _playbackToken) return;
+    if (index >= _sequenceLength(kind)) {
+      _stopSequence();
+      return;
+    }
+    setState(() => _playbackIndex = index);
+
+    if (kind == _Playback.highlight) {
+      final scale = _selectedScale!;
+      final octave = _key.applyTo(_clef.noteAt(_step)).octave;
+      _notePlayer.play(<double>[
+        scale.frequencies(octave: octave, includeOctave: true)[index],
+      ], duration: _sequenceNoteDuration);
+    } else {
+      _jumpToDegree(_progression!.degrees[index]);
+      _playCurrent(duration: _sequenceNoteDuration);
+    }
+
+    _playbackTimer = Timer(
+      _sequenceStepGap,
+      () => _playSequenceStep(token, kind, index + 1),
+    );
   }
 
   void _openDisplaySettings() {
@@ -195,6 +292,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _setChordMode(ChordMode mode) {
+    if (_playback != null) _stopSequence();
     setState(() {
       _chordMode = mode;
       final max = mode == ChordMode.sevenths ? 3 : 2;
@@ -205,9 +303,16 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  /// Moves the note to the nearest position with [degree] (used by the
-  /// progression chips).
+  /// Moves the note to the nearest position with [degree], stopping any
+  /// running sequence (used by the progression chips).
   void _moveToDegree(int degree) {
+    _stopSequence();
+    _jumpToDegree(degree);
+  }
+
+  /// Moves the note to the nearest position with [degree] without touching
+  /// playback, so the progression sequence can walk the chips.
+  void _jumpToDegree(int degree) {
     final scale = _chordScale(_selectedScale);
     final note = _key.applyTo(_clef.noteAt(_step));
     var delta = (degree - _degreeOf(note, scale)) % 7;
@@ -245,6 +350,7 @@ class _HomePageState extends State<HomePage> {
   /// Applies a lesson step to the staff, turning the add-ons off so the path
   /// stays focused.
   void _applyLessonStep() {
+    if (_playback != null) _stopSequence();
     final step = _lessonStep;
     setState(() {
       _clef = step.clef;
@@ -258,6 +364,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _startGuided() {
+    if (_playback != null) _stopSequence();
     setState(() {
       _guided = true;
       _practice = false;
@@ -267,11 +374,15 @@ class _HomePageState extends State<HomePage> {
     _applyLessonStep();
   }
 
-  void _exitGuided() => setState(() => _guided = false);
+  void _exitGuided() {
+    if (_playback != null) _stopSequence();
+    setState(() => _guided = false);
+  }
 
   /// Enters practice mode: a separate mode that hides the answer and quizzes
   /// the learner on the note drawn on the staff.
   void _startPractice() {
+    if (_playback != null) _stopSequence();
     setState(() {
       _practice = true;
       _guided = false;
@@ -287,7 +398,10 @@ class _HomePageState extends State<HomePage> {
     _nextPracticeQuestion();
   }
 
-  void _exitPractice() => setState(() => _practice = false);
+  void _exitPractice() {
+    if (_playback != null) _stopSequence();
+    setState(() => _practice = false);
+  }
 
   void _nextPracticeQuestion() {
     final question = _quizBuilder!.next();
@@ -360,6 +474,21 @@ class _HomePageState extends State<HomePage> {
     final chordScale = _chordScale(scale);
     final note = _key.applyTo(_clef.noteAt(_step));
     final chord = _chordFor(chordScale, note);
+    int? playingPitchClass;
+    var playingUpperOctave = false;
+    if (_playback == _Playback.highlight &&
+        _playbackIndex != null &&
+        scale != null) {
+      final degrees = scale.type.degrees;
+      final semitone = _playbackIndex! < degrees.length
+          ? degrees[_playbackIndex!].semitone
+          : 12;
+      final absolute = scale.tonicPitchClass + semitone;
+      playingPitchClass = absolute % 12;
+      // The keyboard shows a single C-to-C octave, so the closing tonic must
+      // light the upper C rather than the lower one.
+      playingUpperOctave = absolute >= 12;
+    }
 
     return Focus(
       focusNode: _keyboardFocus,
@@ -502,18 +631,44 @@ class _HomePageState extends State<HomePage> {
                       inversion: chord?.inversion ?? 0,
                       progression: _progression,
                       step: _step,
-                      onPlay: () => _playSound(note, chord),
-                      onClefChanged: (clef) => setState(() => _clef = clef),
-                      onKeyChanged: (key) => setState(() => _key = key),
-                      onScaleTypeChanged: (type) =>
-                          setState(() => _scaleType = type),
+                      playingPitchClass: playingPitchClass,
+                      playingUpperOctave: playingUpperOctave,
+                      highlightPlaying: _playback == _Playback.highlight,
+                      progressionPlaying: _playback == _Playback.progression,
+                      activeProgressionIndex: _playback == _Playback.progression
+                          ? _playbackIndex
+                          : null,
+                      onPlay: _playNow,
+                      onPlayHighlight: () =>
+                          _toggleSequence(_Playback.highlight),
+                      onPlayProgression: () =>
+                          _toggleSequence(_Playback.progression),
+                      onClefChanged: (clef) {
+                        _stopSequence();
+                        setState(() => _clef = clef);
+                      },
+                      onKeyChanged: (key) {
+                        _stopSequence();
+                        setState(() => _key = key);
+                      },
+                      onScaleTypeChanged: (type) {
+                        _stopSequence();
+                        setState(() => _scaleType = type);
+                      },
                       onChordModeChanged: _setChordMode,
-                      onInversionChanged: (value) =>
-                          setState(() => _inversion = value),
-                      onProgressionChanged: (value) =>
-                          setState(() => _progression = value),
+                      onInversionChanged: (value) {
+                        _stopSequence();
+                        setState(() => _inversion = value);
+                      },
+                      onProgressionChanged: (value) {
+                        _stopSequence();
+                        setState(() => _progression = value);
+                      },
                       onDegreeSelected: _moveToDegree,
-                      onStepChanged: _setStep,
+                      onStepChanged: (step) {
+                        _stopSequence();
+                        _setStep(step);
+                      },
                     );
 
               if (!sidebar || modePanel) {
@@ -1020,6 +1175,33 @@ class _AccidentalReserve extends StatelessWidget {
   }
 }
 
+/// A small play/stop button shown beside the highlight and progression
+/// selectors; it runs that sequence, or stops it while it is playing.
+class _SequenceButton extends StatelessWidget {
+  const _SequenceButton({
+    super.key,
+    required this.playing,
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  final bool playing;
+  final VoidCallback? onPressed;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      onPressed: onPressed,
+      isSelected: playing,
+      visualDensity: VisualDensity.compact,
+      iconSize: 20,
+      icon: Icon(playing ? Icons.stop : Icons.play_arrow),
+      tooltip: playing ? 'Stop' : tooltip,
+    );
+  }
+}
+
 class _Controls extends StatelessWidget {
   const _Controls({
     super.key,
@@ -1034,7 +1216,14 @@ class _Controls extends StatelessWidget {
     required this.inversion,
     required this.progression,
     required this.step,
+    required this.playingPitchClass,
+    required this.playingUpperOctave,
+    required this.highlightPlaying,
+    required this.progressionPlaying,
+    required this.activeProgressionIndex,
     required this.onPlay,
+    required this.onPlayHighlight,
+    required this.onPlayProgression,
     required this.onClefChanged,
     required this.onKeyChanged,
     required this.onScaleTypeChanged,
@@ -1059,7 +1248,14 @@ class _Controls extends StatelessWidget {
   final int inversion;
   final ChordProgression? progression;
   final int step;
+  final int? playingPitchClass;
+  final bool playingUpperOctave;
+  final bool highlightPlaying;
+  final bool progressionPlaying;
+  final int? activeProgressionIndex;
   final VoidCallback onPlay;
+  final VoidCallback onPlayHighlight;
+  final VoidCallback onPlayProgression;
   final ValueChanged<Clef> onClefChanged;
   final ValueChanged<MusicalKey> onKeyChanged;
   final ValueChanged<ScaleType?> onScaleTypeChanged;
@@ -1134,6 +1330,33 @@ class _Controls extends StatelessWidget {
     final progressionSelector = _ProgressionSelector(
       value: progression,
       onChanged: onProgressionChanged,
+    );
+
+    // Each selector gets a play button beside it: the highlight plays its
+    // scale note by note, the progression plays its chords in turn.
+    final scaleRow = Row(
+      children: [
+        Expanded(child: scaleSelector),
+        const SizedBox(width: 4),
+        _SequenceButton(
+          key: const Key('play-highlight'),
+          playing: highlightPlaying,
+          onPressed: scale == null ? null : onPlayHighlight,
+          tooltip: 'Play the highlighted scale',
+        ),
+      ],
+    );
+    final progressionRow = Row(
+      children: [
+        Expanded(child: progressionSelector),
+        const SizedBox(width: 4),
+        _SequenceButton(
+          key: const Key('play-progression'),
+          playing: progressionPlaying,
+          onPressed: progression == null ? null : onPlayProgression,
+          tooltip: 'Play the progression',
+        ),
+      ],
     );
 
     return ConstrainedBox(
@@ -1310,6 +1533,8 @@ class _Controls extends StatelessWidget {
                         label: note.pitchName,
                         highlightPitchClasses: scale?.pitchClasses,
                         chordPitchClasses: chord?.pitchClassSet,
+                        playingPitchClass: playingPitchClass,
+                        playingUpperOctave: playingUpperOctave,
                       ),
                     ),
                   ],
@@ -1326,6 +1551,8 @@ class _Controls extends StatelessWidget {
                   label: note.pitchName,
                   highlightPitchClasses: scale?.pitchClasses,
                   chordPitchClasses: chord?.pitchClassSet,
+                  playingPitchClass: playingPitchClass,
+                  playingUpperOctave: playingUpperOctave,
                 ),
               ],
               const SizedBox(height: 12),
@@ -1338,10 +1565,10 @@ class _Controls extends StatelessWidget {
                   children: [
                     clefSelector,
                     SizedBox(width: 280, child: keySelector),
-                    SizedBox(width: 260, child: scaleSelector),
+                    SizedBox(width: 260, child: scaleRow),
                     SizedBox(width: 220, child: chordSelector),
                     if (chordMode != ChordMode.off)
-                      SizedBox(width: 300, child: progressionSelector),
+                      SizedBox(width: 300, child: progressionRow),
                     if (chordMode != ChordMode.off) inversionSelector,
                   ],
                 )
@@ -1353,13 +1580,13 @@ class _Controls extends StatelessWidget {
                 // In the rail the selectors are full-width so their labels
                 // never have to truncate; the phone layout keeps them paired.
                 if (sidebar) ...[
-                  scaleSelector,
+                  scaleRow,
                   const SizedBox(height: 8),
                   chordSelector,
                 ] else
                   Row(
                     children: [
-                      Expanded(child: scaleSelector),
+                      Expanded(child: scaleRow),
                       const SizedBox(width: 8),
                       Expanded(child: chordSelector),
                     ],
@@ -1368,7 +1595,7 @@ class _Controls extends StatelessWidget {
                   const SizedBox(height: 8),
                   inversionSelector,
                   const SizedBox(height: 8),
-                  progressionSelector,
+                  progressionRow,
                 ],
               ],
               if (chordMode != ChordMode.off && progression != null) ...[
@@ -1381,6 +1608,7 @@ class _Controls extends StatelessWidget {
                       ? MainAxisAlignment.end
                       : MainAxisAlignment.start,
                   wrap: sidebar,
+                  activeIndex: activeProgressionIndex,
                   onSelected: onDegreeSelected,
                 ),
               ],
@@ -1664,6 +1892,7 @@ class _ProgressionChips extends StatelessWidget {
     required this.onSelected,
     this.alignment = MainAxisAlignment.start,
     this.wrap = false,
+    this.activeIndex,
   });
 
   final ChordProgression progression;
@@ -1679,20 +1908,33 @@ class _ProgressionChips extends StatelessWidget {
   /// off at the edge.
   final bool wrap;
 
+  /// The index of the chip whose chord is currently sounding, so it can be
+  /// emphasised while the progression plays.
+  final int? activeIndex;
+
   List<Widget> _buildChips(
     ChordProgression progression, {
     required bool keyed,
+    required ColorScheme scheme,
   }) => [
     for (var i = 0; i < progression.degrees.length; i++)
       ActionChip(
         key: keyed ? Key('prog-$i') : null,
         visualDensity: VisualDensity.compact,
+        backgroundColor: keyed && i == activeIndex
+            ? scheme.secondaryContainer
+            : null,
         label: Text(
           Chord.diatonic(
             scale,
             progression.degrees[i],
             seventh: seventh,
           ).romanNumeral,
+          // Only the colour changes, never the weight, so the active chip
+          // keeps its width and the row never reflows while playing.
+          style: keyed && i == activeIndex
+              ? TextStyle(color: scheme.onSecondaryContainer)
+              : null,
         ),
         onPressed: () => onSelected(progression.degrees[i]),
       ),
@@ -1709,7 +1951,8 @@ class _ProgressionChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chips = _buildChips(progression, keyed: true);
+    final scheme = Theme.of(context).colorScheme;
+    final chips = _buildChips(progression, keyed: true, scheme: scheme);
     if (wrap) {
       // Reserve the height needed by the longest built-in progression so the
       // rail does not resize (and the panel does not jump) when switching
@@ -1725,7 +1968,9 @@ class _ProgressionChips extends StatelessWidget {
                 child: ExcludeSemantics(
                   child: Opacity(
                     opacity: 0,
-                    child: _wrapChips(_buildChips(longest, keyed: false)),
+                    child: _wrapChips(
+                      _buildChips(longest, keyed: false, scheme: scheme),
+                    ),
                   ),
                 ),
               ),
