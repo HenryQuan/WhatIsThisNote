@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../audio/note_player.dart';
 import '../../core/chord.dart';
 import '../../core/clef.dart';
 import '../../core/key.dart';
@@ -18,10 +19,14 @@ class HomePage extends StatefulWidget {
     super.key,
     required this.themeMode,
     required this.onThemeModeChanged,
+    this.notePlayer,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+
+  /// Overrides the audio player, used by tests to avoid the native plugin.
+  final NotePlayer? notePlayer;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -59,6 +64,28 @@ class _HomePageState extends State<HomePage> {
 
   void _setStep(int step) {
     setState(() => _step = step.clamp(kMinStaffStep, kMaxStaffStep));
+  }
+
+  /// Created on first use so tests that inject a player never touch the plugin.
+  NotePlayer? _ownedPlayer;
+  NotePlayer get _notePlayer =>
+      widget.notePlayer ?? (_ownedPlayer ??= AudioNotePlayer());
+
+  @override
+  void dispose() {
+    _ownedPlayer?.dispose();
+    super.dispose();
+  }
+
+  /// Plays the written [note], or [chord]'s tones when the chord lab is on.
+  void _playSound(Note note, Chord? chord) {
+    final frequencies = chord == null
+        ? <double>[note.frequency]
+        : <double>[
+            for (final step in chord.staffSteps(_step))
+              _key.applyTo(_clef.noteAt(step)).frequency,
+          ];
+    _notePlayer.play(frequencies);
   }
 
   Scale? get _selectedScale => _scaleType == null
@@ -359,6 +386,7 @@ class _HomePageState extends State<HomePage> {
                 inversion: chord?.inversion ?? 0,
                 progression: _progression,
                 step: _step,
+                onPlay: () => _playSound(note, chord),
                 onClefChanged: (clef) => setState(() => _clef = clef),
                 onKeyChanged: (key) => setState(() => _key = key),
                 onScaleTypeChanged: (type) => setState(() => _scaleType = type),
@@ -739,6 +767,7 @@ class _Controls extends StatelessWidget {
     required this.inversion,
     required this.progression,
     required this.step,
+    required this.onPlay,
     required this.onClefChanged,
     required this.onKeyChanged,
     required this.onScaleTypeChanged,
@@ -758,6 +787,7 @@ class _Controls extends StatelessWidget {
   final int inversion;
   final ChordProgression? progression;
   final int step;
+  final VoidCallback onPlay;
   final ValueChanged<Clef> onClefChanged;
   final ValueChanged<MusicalKey> onKeyChanged;
   final ValueChanged<ScaleType?> onScaleTypeChanged;
@@ -870,6 +900,12 @@ class _Controls extends StatelessWidget {
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      IconButton.filledTonal(
+                        key: const Key('play-note'),
+                        onPressed: onPlay,
+                        icon: const Icon(Icons.volume_up),
+                        tooltip: chord == null ? 'Play note' : 'Play chord',
+                      ),
                       IconButton.filledTonal(
                         onPressed: step < kMaxStaffStep
                             ? () => onStepChanged(step + 1)

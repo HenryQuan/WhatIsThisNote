@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:whatisthisnote/audio/note_player.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 import 'package:whatisthisnote/main.dart';
@@ -455,4 +456,49 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(StaffView), findsOneWidget);
   });
+
+  testWidgets('the play button plays the current note', (tester) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+
+    await tester.tap(find.byKey(const Key('play-note')));
+    await tester.pump();
+
+    // The default note is B4 (MIDI 71, A4 == 440 Hz).
+    expect(player.played, hasLength(1));
+    expect(player.played.single, hasLength(1));
+    expect(player.played.single.single, closeTo(493.883, 0.01));
+  });
+
+  testWidgets('the play button plays the chord when the chord lab is on', (
+    tester,
+  ) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Triads').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('play-note')));
+    await tester.pump();
+
+    // B diminished (B D F), voiced low to high.
+    expect(player.played.single, hasLength(3));
+    final frequencies = player.played.single;
+    expect(frequencies[0], lessThan(frequencies[1]));
+    expect(frequencies[1], lessThan(frequencies[2]));
+  });
+}
+
+class _RecordingNotePlayer implements NotePlayer {
+  final List<List<double>> played = [];
+
+  @override
+  Future<void> play(Iterable<double> frequencies) async {
+    played.add(frequencies.toList(growable: false));
+  }
+
+  @override
+  Future<void> dispose() async {}
 }

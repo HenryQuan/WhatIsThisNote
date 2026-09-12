@@ -2,13 +2,17 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'audio/note_player.dart';
 import 'ui/page/home_page.dart';
 import 'ui/theme.dart';
 
 void main() => runApp(const WhatIsThisNoteApp());
 
 class WhatIsThisNoteApp extends StatefulWidget {
-  const WhatIsThisNoteApp({super.key});
+  const WhatIsThisNoteApp({super.key, this.notePlayer});
+
+  /// Overrides the audio player, used by tests to avoid the native plugin.
+  final NotePlayer? notePlayer;
 
   @override
   State<WhatIsThisNoteApp> createState() => _WhatIsThisNoteAppState();
@@ -37,6 +41,7 @@ class _WhatIsThisNoteAppState extends State<WhatIsThisNoteApp> {
           home: HomePage(
             themeMode: _themeMode,
             onThemeModeChanged: (mode) => setState(() => _themeMode = mode),
+            notePlayer: widget.notePlayer,
           ),
         );
       },

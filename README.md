@@ -19,6 +19,7 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 - [x] Note names in scientific pitch (C, D, E...) and fixed-do solfege (Do, Re, Mi...)
 - [x] Numbered notation (jianpu) degree next to the name, 1 = Do ... 7 = Ti
 - [x] Mini piano keyboard showing which key the note is on
+- [x] Hear the note, or the current chord, with a built-in synthesizer (no audio assets)
 - [x] Treble, bass and alto clefs
 - [x] Responsive layout (line spacing scales with the screen)
 - [x] Light and dark themes
@@ -40,10 +41,12 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 
 The chord lab works from the note's scale degree and only builds chords on
 seven-note scales; it falls back to the key's major or natural minor scale and
-shows no chord for chromatic notes. Progressions are selected and tapped
-rather than played (there is no audio engine). Sharps and flats in the guided
-path come from key signatures, so the path does not yet show accidentals that
-are not in the key.
+shows no chord for chromatic notes. The play button sounds the written note,
+or the chord's tones when the chord lab is on. Tones are synthesized in Dart
+and played through `audioplayers`, which works on Android, iOS, web, Windows,
+macOS and Linux. Progressions are selected and tapped rather than played as a
+sequence. Sharps and flats in the guided path come from key signatures, so the
+path does not yet show accidentals that are not in the key.
 
 ## Getting started
 

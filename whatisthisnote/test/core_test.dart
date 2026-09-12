@@ -1,7 +1,9 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:whatisthisnote/audio/tone.dart';
 import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
@@ -497,6 +499,64 @@ void main() {
           }
         }
       }
+    });
+  });
+
+  group('Tone', () {
+    test('renders a valid 16-bit mono WAV', () {
+      final bytes = toneWav(
+        [440.0],
+        duration: const Duration(milliseconds: 125),
+        sampleRate: 8000,
+      );
+      final data = ByteData.sublistView(bytes);
+      expect(String.fromCharCodes(bytes.sublist(0, 4)), 'RIFF');
+      expect(String.fromCharCodes(bytes.sublist(8, 12)), 'WAVE');
+      expect(String.fromCharCodes(bytes.sublist(12, 16)), 'fmt ');
+      expect(String.fromCharCodes(bytes.sublist(36, 40)), 'data');
+      expect(data.getUint32(4, Endian.little), bytes.length - 8);
+      expect(data.getUint16(20, Endian.little), 1); // PCM
+      expect(data.getUint16(22, Endian.little), 1); // mono
+      expect(data.getUint32(24, Endian.little), 8000);
+      expect(data.getUint16(34, Endian.little), 16); // bits per sample
+      expect(data.getUint32(40, Endian.little), 2000); // 8000 * 0.125 * 2
+      expect(bytes.length, 44 + 2000);
+    });
+
+    test('renders silence when there is nothing to play', () {
+      final bytes = toneWav(
+        const [],
+        duration: const Duration(milliseconds: 10),
+        sampleRate: 8000,
+      );
+      final data = ByteData.sublistView(bytes);
+      for (var i = 44; i < bytes.length; i += 2) {
+        expect(data.getInt16(i, Endian.little), 0);
+      }
+    });
+
+    test('mixes every frequency into the samples', () {
+      final one = toneWav(
+        [440.0],
+        duration: const Duration(milliseconds: 50),
+        sampleRate: 8000,
+      );
+      final two = toneWav(
+        [440.0, 660.0],
+        duration: const Duration(milliseconds: 50),
+        sampleRate: 8000,
+      );
+      expect(two.length, one.length);
+      final a = ByteData.sublistView(one);
+      final b = ByteData.sublistView(two);
+      var differs = false;
+      for (var i = 44; i < one.length; i += 2) {
+        if (a.getInt16(i, Endian.little) != b.getInt16(i, Endian.little)) {
+          differs = true;
+          break;
+        }
+      }
+      expect(differs, isTrue);
     });
   });
 }
