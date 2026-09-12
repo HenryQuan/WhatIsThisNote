@@ -1,10 +1,34 @@
-# WhatIsThisNode
-I started playing piano last January 2018 and I couldn't read music sheets fast enough. 
-This app aims to solve this issue and also for anyone who want to read music sheets.
+# WhatIsThisNote
+
+I started playing piano in January 2018 and I couldn't read music sheets fast
+enough. This app aims to solve that.
+
+Drag the note up and down the staff and the app tells you what the note is,
+automatically drawing ledger lines when the note goes above or below the five
+lines.
 
 ## Features
-- [ ] Simple and clean
-- [ ] Swipe up or down to change note
-- [ ] Smooth animation
+
+- [x] Simple and clean Material 3 UI
+- [x] Drag or tap the note to change its pitch; it snaps to the nearest position
+- [x] Smooth snap animation
+- [x] Automatic ledger lines above and below the staff
+- [x] Note names in scientific pitch (C, D, E...) and fixed-do solfege (Do, Re, Mi...)
+- [x] Treble, bass and alto clefs
+- [x] Responsive layout (line spacing scales with the screen)
+- [x] Light and dark themes
+
 ### Pro features
-- [ ] Quiz (Time attack with levels)
+
+- [ ] Quiz (time attack with levels)
+
+## Getting started
+
+```bash
+cd whatisthisnote
+flutter pub get
+flutter run
+```
+
+The app renders clefs and noteheads with the bundled
+[Bravura](https://github.com/steinbergmedia/bravura) music font (SIL OFL).

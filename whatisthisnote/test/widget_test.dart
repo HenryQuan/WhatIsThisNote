@@ -1,30 +1,55 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility that Flutter provides. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:whatisthisnote/main.dart';
+import 'package:whatisthisnote/ui/widgets/staff_view.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(MyApp());
+  testWidgets('shows the default treble middle line note', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      'B4',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-solfege'))).data,
+      'Si',
+    );
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('the higher button moves the note up the staff', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.byTooltip('Higher'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      'C5',
+    );
+  });
+
+  testWidgets('switching clef changes the note name', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.text('Bass'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      'D3',
+    );
+  });
+
+  testWidgets('dragging the staff changes the note', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.drag(find.byType(StaffView), const Offset(0, -60));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      isNot('B4'),
+    );
   });
 }

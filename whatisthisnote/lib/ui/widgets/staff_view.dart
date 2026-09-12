@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+
+import '../../core/clef.dart';
+import '../../core/staff_geometry.dart';
+import '../painters/notation_painter.dart';
+
+/// An interactive staff. The note can be dragged vertically to change its
+/// pitch; it snaps to the nearest staff position and animates into place.
+/// Dragging horizontally moves the note along the staff.
+class StaffView extends StatefulWidget {
+  const StaffView({
+    super.key,
+    required this.clef,
+    required this.step,
+    required this.onStepChanged,
+    this.minStep = -6,
+    this.maxStep = 14,
+  });
+
+  final Clef clef;
+
+  /// The settled (integer) staff step.
+  final int step;
+
+  /// Called whenever the snapped step changes, including while dragging.
+  final ValueChanged<int> onStepChanged;
+
+  final int minStep;
+  final int maxStep;
+
+  @override
+  State<StaffView> createState() => _StaffViewState();
+}
+
+class _StaffViewState extends State<StaffView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  Tween<double>? _tween;
+
+  /// Continuous staff position of the note.
+  late double _currentStep;
+
+  /// Horizontal centre of the note.
+  double _noteX = -1;
+
+  bool _dragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStep = widget.step.toDouble();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    )..addListener(_onTick);
+  }
+
+  void _onTick() {
+    final tween = _tween;
+    if (tween == null) return;
+    setState(() => _currentStep = tween.evaluate(_controller));
+  }
+
+  @override
+  void didUpdateWidget(covariant StaffView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_dragging && widget.step != oldWidget.step) {
+      final target = widget.step.toDouble();
+      if ((_currentStep - target).abs() > 0.001) {
+        _animateTo(target);
+      }
+    }
+  }
+
+  void _animateTo(double target) {
+    _controller.stop();
+    _tween = Tween<double>(begin: _currentStep, end: target);
+    _controller.forward(from: 0);
+  }
+
+  void _onPanStart(DragStartDetails details) {
+    _dragging = true;
+    _controller.stop();
+  }
+
+  void _onPanUpdate(StaffGeometry geometry, DragUpdateDetails details) {
+    final next = geometry.clampStep(
+      _currentStep - details.delta.dy / geometry.halfSpace,
+    );
+    setState(() {
+      _currentStep = next;
+      _noteX = _clampNoteX(geometry, _noteX + details.delta.dx);
+    });
+    final rounded = next.round();
+    if (rounded != widget.step) {
+      widget.onStepChanged(rounded);
+    }
+  }
+
+  void _onPanEnd(StaffGeometry geometry) {
+    _dragging = false;
+    _animateTo(geometry.clampStep(_currentStep.round()));
+  }
+
+  void _onTapUp(StaffGeometry geometry, TapUpDetails details) {
+    _dragging = false;
+    _controller.stop();
+    final target = geometry.clampStep(
+      geometry.stepForY(details.localPosition.dy).round(),
+    );
+    setState(() {
+      _noteX = _clampNoteX(geometry, details.localPosition.dx);
+    });
+    _animateTo(target);
+    if (target.round() != widget.step) {
+      widget.onStepChanged(target.round());
+    }
+  }
+
+  double _clampNoteX(StaffGeometry geometry, double x) {
+    final lo = geometry.staffLeft + geometry.space * 2.6;
+    final hi = geometry.staffRight - geometry.space * 0.6;
+    if (lo >= hi) return geometry.size.width / 2;
+    return x.clamp(lo, hi);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final geometry = StaffGeometry.forSize(
+          Size(constraints.maxWidth, constraints.maxHeight),
+        );
+        if (_noteX < 0) {
+          _noteX = (geometry.staffLeft + geometry.staffRight) / 2;
+        }
+        _noteX = _clampNoteX(geometry, _noteX);
+
+        final scheme = Theme.of(context).colorScheme;
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: _onPanStart,
+          onPanUpdate: (details) => _onPanUpdate(geometry, details),
+          onPanEnd: (_) => _onPanEnd(geometry),
+          onTapUp: (details) => _onTapUp(geometry, details),
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: NotationPainter(
+              geometry: geometry,
+              clef: widget.clef,
+              step: _currentStep,
+              noteX: _noteX,
+              lineColor: scheme.onSurface.withValues(alpha: 0.85),
+              noteColor: scheme.primary,
+              labelColor: scheme.onSurface,
+              showLabel: true,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
