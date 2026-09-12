@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/main.dart';
+import 'package:whatisthisnote/ui/widgets/piano_keyboard.dart';
 import 'package:whatisthisnote/ui/widgets/staff_view.dart';
 
 void main() {
@@ -15,6 +16,18 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('note-solfege'))).data,
       'Si',
     );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-degree'))).data,
+      '7',
+    );
+  });
+
+  testWidgets('shows a piano keyboard for the current note', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    final piano = tester.widget<PianoKeyboard>(find.byType(PianoKeyboard));
+    expect(piano.midi, 71); // B4
+    expect(piano.label, 'B');
   });
 
   testWidgets('the higher button moves the note up the staff', (tester) async {
@@ -77,5 +90,41 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('note-name'))).data,
       'F\u266F5',
     );
+  });
+
+  testWidgets('the staff size does not jump when controls change',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    final baseline = tester.getSize(find.byType(StaffView)).height;
+
+    for (final clef in ['Bass', 'Alto', 'Treble']) {
+      await tester.tap(find.text(clef));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byType(StaffView)).height,
+        baseline,
+        reason: '$clef clef resized the staff',
+      );
+    }
+
+    await tester.tap(find.byKey(const Key('key-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('G major').last);
+    await tester.pumpAndSettle();
+
+    for (var i = 0; i < 10; i++) {
+      await tester.tap(find.byTooltip('Higher'));
+      await tester.pumpAndSettle();
+    }
+    expect(
+      tester.getSize(find.byType(StaffView)).height,
+      baseline,
+      reason: 'changing the note resized the staff',
+    );
+
+    await tester.binding.setSurfaceSize(null);
   });
 }

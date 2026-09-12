@@ -20,6 +20,10 @@ enum NoteLetter {
   /// Fixed-do solfege name, e.g. `Do`.
   final String solfege;
 
+  /// Number used in numbered notation (jianpu): `1 == Do`, `2 == Re`, ...,
+  /// `7 == Ti`.
+  int get degree => index + 1;
+
   /// Semitone offset from C within the same octave.
   int get semitone => const [0, 2, 4, 5, 7, 9, 11][index];
 }
@@ -50,17 +54,24 @@ class Note implements Comparable<Note> {
   /// The scientific octave number (C4 is middle C).
   int get octave => (diatonicIndex - (diatonicIndex % 7)) ~/ 7;
 
-  /// Scientific pitch name, e.g. `E4` or `F♯5`.
-  String get name {
+  /// Scientific pitch name without the octave, e.g. `F♯`.
+  String get pitchName {
     final suffix = accidental == Accidental.natural ? '' : accidental.text;
-    return '${letter.name}$suffix$octave';
+    return '${letter.name}$suffix';
   }
+
+  /// Scientific pitch name, e.g. `E4` or `F♯5`.
+  String get name => '$pitchName$octave';
 
   /// Fixed-do solfege name, e.g. `Mi` or `Fa♯`.
   String get solfege {
     final suffix = accidental == Accidental.natural ? '' : accidental.text;
     return '${letter.solfege}$suffix';
   }
+
+  /// Number used in numbered notation, `1` for Do through `7` for Ti. The
+  /// octave above is `8` (again Do).
+  int get degree => letter.degree;
 
   /// MIDI note number using standard tuning (C4 == 60).
   int get midi => (octave + 1) * 12 + letter.semitone + accidental.offset;

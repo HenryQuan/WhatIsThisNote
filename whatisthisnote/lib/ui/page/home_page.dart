@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/clef.dart';
 import '../../core/key.dart';
 import '../../core/staff_geometry.dart';
+import '../widgets/piano_keyboard.dart';
 import '../widgets/staff_view.dart';
 
 /// The main screen: an interactive staff plus controls for the clef, the key,
@@ -83,6 +84,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             _Controls(
+              key: const Key('controls'),
               clef: _clef,
               keySignature: _key,
               step: _step,
@@ -110,6 +112,7 @@ class _HomePageState extends State<HomePage> {
 
 class _Controls extends StatelessWidget {
   const _Controls({
+    super.key,
     required this.clef,
     required this.keySignature,
     required this.step,
@@ -170,6 +173,39 @@ class _Controls extends StatelessWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${note.degree}',
+                            key: const Key('note-degree'),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'numbered notation (1 = Do … 8 = Do)',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -195,7 +231,13 @@ class _Controls extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          PianoKeyboard(
+            midi: note.midi,
+            label: note.pitchName,
+          ),
+          const SizedBox(height: 12),
           SegmentedButton<Clef>(
+            showSelectedIcon: false,
             segments: [
               for (final value in Clef.values)
                 ButtonSegment<Clef>(

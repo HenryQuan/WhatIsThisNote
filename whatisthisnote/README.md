@@ -1,7 +1,8 @@
 # whatisthisnote
 
 The Flutter app for [WhatIsThisNote](../README.md). Drag a note around the
-staff to learn to read music; ledger lines and note names update live.
+staff to learn to read music; ledger lines, key signatures, note names and a
+mini piano keyboard update live.
 
 ## Run
 
@@ -19,7 +20,8 @@ flutter test
 
 ## Project layout
 
-- `lib/core` - music theory and staff geometry (pure Dart, unit tested)
-- `lib/ui/painters` - the `CustomPainter` that draws the staff and note
-- `lib/ui/widgets` - the interactive, draggable `StaffView`
+- `lib/core` - music theory (notes, clefs, keys) and staff geometry
+- `lib/ui/painters` - the `CustomPainter` that draws the staff, clef, key
+  signature, ledger lines and note
+- `lib/ui/widgets` - the interactive `StaffView` and the `PianoKeyboard`
 - `lib/ui/page` - the home screen

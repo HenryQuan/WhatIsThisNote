@@ -18,6 +18,7 @@ class NotationPainter extends CustomPainter {
     required this.lineColor,
     required this.noteColor,
     required this.labelColor,
+    required this.labelBackgroundColor,
     required this.showLabel,
   });
 
@@ -35,6 +36,7 @@ class NotationPainter extends CustomPainter {
   final Color lineColor;
   final Color noteColor;
   final Color labelColor;
+  final Color labelBackgroundColor;
   final bool showLabel;
 
   @override
@@ -143,18 +145,12 @@ class NotationPainter extends CustomPainter {
     final note = key.applyTo(clef.noteAt(step.round()));
     final painter = TextPainter(
       text: TextSpan(
-        text: note.name,
+        text: note.pitchName,
         style: TextStyle(
           color: labelColor,
-          fontSize: geometry.space * 0.85,
+          fontSize: geometry.space * 1.05,
           fontWeight: FontWeight.w700,
         ),
-        children: [
-          TextSpan(
-            text: '  ${note.solfege}',
-            style: TextStyle(fontWeight: FontWeight.w400),
-          ),
-        ],
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -165,6 +161,18 @@ class NotationPainter extends CustomPainter {
       x = noteX - gap - painter.width;
     }
     final y = geometry.yForStep(step) - painter.height / 2;
+
+    final pad = geometry.space * 0.25;
+    final background = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        x - pad,
+        y - pad,
+        painter.width + pad * 2,
+        painter.height + pad * 2,
+      ),
+      Radius.circular(geometry.space * 0.3),
+    );
+    canvas.drawRRect(background, Paint()..color = labelBackgroundColor);
     painter.paint(canvas, Offset(x, y));
   }
 
@@ -207,6 +215,7 @@ class NotationPainter extends CustomPainter {
         old.lineColor != lineColor ||
         old.noteColor != noteColor ||
         old.labelColor != labelColor ||
+        old.labelBackgroundColor != labelBackgroundColor ||
         old.showLabel != showLabel;
   }
 }

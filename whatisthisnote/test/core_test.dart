@@ -26,6 +26,20 @@ void main() {
       expect(Note.fromLetter(NoteLetter.b, 3).solfege, 'Si');
     });
 
+    test('computes numbered notation degrees', () {
+      expect(Note.fromLetter(NoteLetter.c, 4).degree, 1);
+      expect(Note.fromLetter(NoteLetter.g, 4).degree, 5);
+      expect(Note.fromLetter(NoteLetter.b, 3).degree, 7);
+    });
+
+    test('pitch names omit the octave but keep the accidental', () {
+      expect(Note.fromLetter(NoteLetter.g, 4).pitchName, 'G');
+      final fSharp = Note.fromLetter(NoteLetter.f, 4)
+          .withAccidental(Accidental.sharp);
+      expect(fSharp.pitchName, 'F\u266F');
+      expect(fSharp.name, 'F\u266F4');
+    });
+
     test('computes MIDI numbers and frequencies', () {
       expect(Note.fromLetter(NoteLetter.c, 4).midi, 60);
       expect(Note.fromLetter(NoteLetter.a, 4).midi, 69);
