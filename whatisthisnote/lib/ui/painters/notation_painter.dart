@@ -23,6 +23,8 @@ class NotationPainter extends CustomPainter {
     required this.showLabel,
     this.chordSteps = const [],
     this.chordColor = const Color(0xFF000000),
+    this.targetStep,
+    this.targetColor,
   });
 
   final StaffGeometry geometry;
@@ -48,6 +50,12 @@ class NotationPainter extends CustomPainter {
   /// Colour used for the chord tones other than the root.
   final Color chordColor;
 
+  /// Optional target staff step to hint at, drawn as a hollow notehead.
+  final int? targetStep;
+
+  /// Colour of the hollow target notehead. Defaults to [noteColor].
+  final Color? targetColor;
+
   /// Staff step the label describes: the lowest chord tone (the bass) when a
   /// chord is shown, otherwise the written note.
   int get labelStep => chordSteps.isEmpty ? step.round() : chordSteps.first;
@@ -66,6 +74,7 @@ class NotationPainter extends CustomPainter {
     _paintClef(canvas);
     _paintKeySignature(canvas);
     _paintLedgerLines(canvas, linePaint);
+    _paintTarget(canvas);
     if (chordSteps.isEmpty) {
       _paintNote(canvas);
     } else {
@@ -114,7 +123,10 @@ class NotationPainter extends CustomPainter {
   }
 
   void _paintLedgerLines(Canvas canvas, Paint paint) {
-    final notes = chordSteps.isEmpty ? [step.round()] : chordSteps;
+    final notes = <int>[
+      if (chordSteps.isEmpty) step.round() else ...chordSteps,
+      ?targetStep,
+    ];
     final halfWidth = geometry.space * 0.95;
     final drawn = <int>{};
     for (final note in notes) {
@@ -128,6 +140,22 @@ class NotationPainter extends CustomPainter {
         );
       }
     }
+  }
+
+  void _paintTarget(Canvas canvas) {
+    final target = targetStep;
+    if (target == null || target == step.round()) return;
+    final notehead = _layoutGlyph(
+      NotationGlyphs.noteheadWhole,
+      geometry.space * 4,
+      targetColor ?? noteColor,
+    );
+    _paintGlyph(
+      canvas,
+      notehead,
+      centerX: noteX,
+      baselineY: geometry.yForStep(target.toDouble()),
+    );
   }
 
   void _paintNote(Canvas canvas) {
@@ -277,6 +305,8 @@ class NotationPainter extends CustomPainter {
         old.labelBackgroundColor != labelBackgroundColor ||
         old.showLabel != showLabel ||
         !listEquals(old.chordSteps, chordSteps) ||
-        old.chordColor != chordColor;
+        old.chordColor != chordColor ||
+        old.targetStep != targetStep ||
+        old.targetColor != targetColor;
   }
 }

@@ -4,6 +4,7 @@ import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/key.dart';
+import 'package:whatisthisnote/core/lesson.dart';
 import 'package:whatisthisnote/core/note.dart';
 import 'package:whatisthisnote/core/scale.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
@@ -392,6 +393,36 @@ void main() {
     test('lists playable progressions', () {
       expect(kProgressions, isNotEmpty);
       expect(kProgressions.first.degrees, [1, 5, 6, 4]);
+    });
+  });
+
+  group('Lesson', () {
+    test('has well formed steps', () {
+      expect(kLessons, isNotEmpty);
+      for (final lesson in kLessons) {
+        expect(lesson.title, isNotEmpty);
+        expect(lesson.steps, isNotEmpty);
+        expect(
+          lesson.steps.any((step) => step.isPractice),
+          isTrue,
+          reason: '${lesson.title} needs at least one practice step',
+        );
+        for (final step in lesson.steps) {
+          expect(step.title, isNotEmpty);
+          expect(step.instruction, isNotEmpty);
+          expect(step.step, inInclusiveRange(kMinStaffStep, kMaxStaffStep));
+          if (step.isPractice) {
+            expect(step.targetStep, isNotNull);
+            expect(step.targetStep, isNot(step.step));
+            expect(
+              step.targetStep,
+              inInclusiveRange(kMinStaffStep, kMaxStaffStep),
+            );
+          } else {
+            expect(step.targetStep, isNull);
+          }
+        }
+      }
     });
   });
 }

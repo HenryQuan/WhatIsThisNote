@@ -30,12 +30,16 @@ lines.
       staff and piano with their chord symbol and Roman numeral, root/1st/2nd/
       3rd inversion with slash-bass names, and tappable progressions
       (I-V-vi-IV, ii-V-I, canon, Andalusian)
-- [ ] Guided theory path (step-by-step lessons)
+- [x] Guided theory path: short lessons on the staff, its lines and spaces, the
+      bass clef and sharps/flats. Each lesson explains a little and then asks
+      you to drag the note to a target, drawn as a hollow notehead
 
 The chord lab works from the note's scale degree and only builds chords on
 seven-note scales; it falls back to the key's major or natural minor scale and
 shows no chord for chromatic notes. Progressions are selected and tapped
-rather than played (there is no audio engine).
+rather than played (there is no audio engine). Sharps and flats in the guided
+path come from key signatures, so the path does not yet show accidentals that
+are not in the key.
 
 ### Pro features
 

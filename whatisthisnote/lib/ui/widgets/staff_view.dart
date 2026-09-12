@@ -16,6 +16,7 @@ class StaffView extends StatefulWidget {
     required this.step,
     required this.onStepChanged,
     this.chordSteps = const [],
+    this.targetStep,
     this.minStep = -6,
     this.maxStep = 14,
   });
@@ -28,6 +29,10 @@ class StaffView extends StatefulWidget {
 
   /// Staff steps of an optional chord to draw around the note, low to high.
   final List<int> chordSteps;
+
+  /// Optional staff step to hint at, drawn as a hollow target notehead (used by
+  /// the guided theory path).
+  final int? targetStep;
 
   /// Called whenever the snapped step changes, including while dragging.
   final ValueChanged<int> onStepChanged;
@@ -183,6 +188,8 @@ class _StaffViewState extends State<StaffView>
               showLabel: true,
               chordSteps: widget.chordSteps,
               chordColor: scheme.tertiary,
+              targetStep: widget.targetStep,
+              targetColor: scheme.outline,
             ),
           ),
         );

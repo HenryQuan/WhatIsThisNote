@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/chord.dart';
 import '../../core/clef.dart';
 import '../../core/key.dart';
+import '../../core/lesson.dart';
 import '../../core/note.dart';
 import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
@@ -36,6 +37,11 @@ class _HomePageState extends State<HomePage> {
   ChordMode _chordMode = ChordMode.off;
   int _inversion = 0;
   ChordProgression? _progression;
+
+  /// Optional guided theory path (an add-on), off by default.
+  bool _guided = false;
+  int _lessonIndex = 0;
+  int _stepIndex = 0;
 
   /// Middle line of the treble staff (B4).
   int _step = 4;
@@ -97,6 +103,89 @@ class _HomePageState extends State<HomePage> {
     _setStep(_step + delta);
   }
 
+  Lesson get _lesson => kLessons[_lessonIndex];
+  LessonStep get _lessonStep => _lesson.steps[_stepIndex];
+  int get _totalSteps =>
+      kLessons.fold(0, (sum, lesson) => sum + lesson.steps.length);
+  int get _completedSteps {
+    var count = 0;
+    for (var i = 0; i < _lessonIndex; i++) {
+      count += kLessons[i].steps.length;
+    }
+    return count + _stepIndex;
+  }
+
+  bool get _isLastStep =>
+      _lessonIndex == kLessons.length - 1 &&
+      _stepIndex == _lesson.steps.length - 1;
+
+  /// True once the learner has matched a practice step's target.
+  bool get _practiceMatched =>
+      !_lessonStep.isPractice || _step == _lessonStep.targetStep;
+
+  /// The staff step the guided path is hinting at, or `null` when off or
+  /// already matched.
+  int? get _guidedTarget {
+    if (!_guided || !_lessonStep.isPractice) return null;
+    return _step == _lessonStep.targetStep ? null : _lessonStep.targetStep;
+  }
+
+  /// Applies a lesson step to the staff, turning the add-ons off so the path
+  /// stays focused.
+  void _applyLessonStep() {
+    final step = _lessonStep;
+    setState(() {
+      _clef = step.clef;
+      _key = step.key;
+      _scaleType = null;
+      _chordMode = ChordMode.off;
+      _inversion = 0;
+      _progression = null;
+      _step = step.step;
+    });
+  }
+
+  void _startGuided() {
+    setState(() {
+      _guided = true;
+      _lessonIndex = 0;
+      _stepIndex = 0;
+    });
+    _applyLessonStep();
+  }
+
+  void _exitGuided() => setState(() => _guided = false);
+
+  void _nextLessonStep() {
+    if (!_practiceMatched) return;
+    if (!_isLastStep) {
+      setState(() {
+        if (_stepIndex + 1 < _lesson.steps.length) {
+          _stepIndex++;
+        } else {
+          _lessonIndex++;
+          _stepIndex = 0;
+        }
+      });
+      _applyLessonStep();
+    } else {
+      _exitGuided();
+    }
+  }
+
+  void _previousLessonStep() {
+    if (_lessonIndex == 0 && _stepIndex == 0) return;
+    setState(() {
+      if (_stepIndex > 0) {
+        _stepIndex--;
+      } else {
+        _lessonIndex--;
+        _stepIndex = kLessons[_lessonIndex].steps.length - 1;
+      }
+    });
+    _applyLessonStep();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scale = _selectedScale;
@@ -108,6 +197,12 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('What is this note?'),
         actions: [
+          IconButton(
+            tooltip: 'Guided path',
+            isSelected: _guided,
+            icon: const Icon(Icons.school),
+            onPressed: _guided ? _exitGuided : _startGuided,
+          ),
           PopupMenuButton<ThemeMode>(
             tooltip: 'Theme',
             icon: Icon(_themeIcon(widget.themeMode)),
@@ -142,32 +237,50 @@ class _HomePageState extends State<HomePage> {
                 keySignature: _key,
                 step: _step,
                 chordSteps: chord?.staffSteps(_step) ?? const [],
+                targetStep: _guidedTarget,
                 onStepChanged: (step) {
                   if (step != _step) setState(() => _step = step);
                 },
               ),
             ),
-            _Controls(
-              key: const Key('controls'),
-              clef: _clef,
-              keySignature: _key,
-              scale: scale,
-              chord: chord,
-              chordScale: chordScale,
-              chordMode: _chordMode,
-              inversion: chord?.inversion ?? 0,
-              progression: _progression,
-              step: _step,
-              onClefChanged: (clef) => setState(() => _clef = clef),
-              onKeyChanged: (key) => setState(() => _key = key),
-              onScaleTypeChanged: (type) => setState(() => _scaleType = type),
-              onChordModeChanged: _setChordMode,
-              onInversionChanged: (value) => setState(() => _inversion = value),
-              onProgressionChanged: (value) =>
-                  setState(() => _progression = value),
-              onDegreeSelected: _moveToDegree,
-              onStepChanged: _setStep,
-            ),
+            if (_guided)
+              _GuidedPanel(
+                key: const Key('guided-panel'),
+                lesson: _lesson,
+                step: _lessonStep,
+                lessonIndex: _lessonIndex,
+                stepIndex: _stepIndex,
+                totalSteps: _totalSteps,
+                completedSteps: _completedSteps,
+                isLastStep: _isLastStep,
+                matched: _practiceMatched,
+                onBack: _previousLessonStep,
+                onNext: _nextLessonStep,
+                onExit: _exitGuided,
+              )
+            else
+              _Controls(
+                key: const Key('controls'),
+                clef: _clef,
+                keySignature: _key,
+                scale: scale,
+                chord: chord,
+                chordScale: chordScale,
+                chordMode: _chordMode,
+                inversion: chord?.inversion ?? 0,
+                progression: _progression,
+                step: _step,
+                onClefChanged: (clef) => setState(() => _clef = clef),
+                onKeyChanged: (key) => setState(() => _key = key),
+                onScaleTypeChanged: (type) => setState(() => _scaleType = type),
+                onChordModeChanged: _setChordMode,
+                onInversionChanged: (value) =>
+                    setState(() => _inversion = value),
+                onProgressionChanged: (value) =>
+                    setState(() => _progression = value),
+                onDegreeSelected: _moveToDegree,
+                onStepChanged: _setStep,
+              ),
           ],
         ),
       ),
@@ -183,6 +296,145 @@ class _HomePageState extends State<HomePage> {
       case ThemeMode.system:
         return Icons.brightness_auto;
     }
+  }
+}
+
+/// The panel shown while the guided theory path is active. It replaces the
+/// manual controls with the current step and Back / Next navigation.
+class _GuidedPanel extends StatelessWidget {
+  const _GuidedPanel({
+    super.key,
+    required this.lesson,
+    required this.step,
+    required this.lessonIndex,
+    required this.stepIndex,
+    required this.totalSteps,
+    required this.completedSteps,
+    required this.isLastStep,
+    required this.matched,
+    required this.onBack,
+    required this.onNext,
+    required this.onExit,
+  });
+
+  final Lesson lesson;
+  final LessonStep step;
+  final int lessonIndex;
+  final int stepIndex;
+  final int totalSteps;
+  final int completedSteps;
+  final bool isLastStep;
+  final bool matched;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final canGoBack = lessonIndex > 0 || stepIndex > 0;
+    final canAdvance = !step.isPractice || matched;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.school, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Lesson ${lessonIndex + 1} of ${kLessons.length}: '
+                      '${lesson.title}',
+                      key: const Key('guided-lesson'),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('guided-exit'),
+                    tooltip: 'Exit guided path',
+                    icon: const Icon(Icons.close),
+                    onPressed: onExit,
+                  ),
+                ],
+              ),
+              LinearProgressIndicator(
+                key: const Key('guided-progress'),
+                value: (completedSteps + 1) / totalSteps,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                step.title,
+                key: const Key('guided-step-title'),
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                step.instruction,
+                key: const Key('guided-instruction'),
+                style: theme.textTheme.bodyMedium,
+              ),
+              if (step.isPractice) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      matched ? Icons.check_circle : Icons.touch_app,
+                      size: 18,
+                      color: matched ? scheme.primary : scheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        matched
+                            ? 'That is the note. Well done!'
+                            : 'Drag the note to the hollow notehead.',
+                        key: const Key('guided-status'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: matched
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const Key('guided-back'),
+                      onPressed: canGoBack ? onBack : null,
+                      child: const Text('Back'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('guided-next'),
+                      onPressed: canAdvance ? onNext : null,
+                      child: Text(isLastStep ? 'Finish' : 'Next'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

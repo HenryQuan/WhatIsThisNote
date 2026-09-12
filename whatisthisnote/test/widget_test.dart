@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:whatisthisnote/core/staff_geometry.dart';
 import 'package:whatisthisnote/main.dart';
 import 'package:whatisthisnote/ui/painters/notation_painter.dart';
 import 'package:whatisthisnote/ui/widgets/piano_keyboard.dart';
@@ -321,5 +322,76 @@ void main() {
     );
 
     await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('the guided path starts on the first lesson', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    expect(find.byKey(const Key('guided-panel')), findsNothing);
+
+    await tester.tap(find.byTooltip('Guided path'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('guided-panel')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('guided-lesson'))).data,
+      contains('The five lines'),
+    );
+    expect(tester.widget<StaffView>(find.byType(StaffView)).step, 4);
+
+    await tester.tap(find.byKey(const Key('guided-next')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<StaffView>(find.byType(StaffView)).step, 2);
+
+    await tester.tap(find.byKey(const Key('guided-exit')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('guided-panel')), findsNothing);
+    expect(find.byKey(const Key('controls')), findsOneWidget);
+  });
+
+  testWidgets('a practice step unlocks Next when the note reaches the target', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(find.byTooltip('Guided path'));
+    await tester.pumpAndSettle();
+
+    // Three explanation steps, then the first practice step.
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.byKey(const Key('guided-next')));
+      await tester.pumpAndSettle();
+    }
+
+    FilledButton next() =>
+        tester.widget<FilledButton>(find.byKey(const Key('guided-next')));
+
+    expect(tester.widget<StaffView>(find.byType(StaffView)).step, 6);
+    expect(find.byKey(const Key('guided-status')), findsOneWidget);
+    expect(next().onPressed, isNull);
+
+    // Drag the note down to the middle line by tapping the staff there.
+    final rect = tester.getRect(find.byType(StaffView));
+    final geometry = StaffGeometry.forSize(rect.size);
+    await tester.tapAt(Offset(rect.center.dx, rect.top + geometry.yForStep(4)));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<StaffView>(find.byType(StaffView)).step, 4);
+    expect(next().onPressed, isNotNull);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('guided-status'))).data,
+      contains('Well done'),
+    );
+  });
+
+  testWidgets('the dark theme renders the staff', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byTooltip('Theme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dark').last);
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byType(StaffView), findsOneWidget);
   });
 }
