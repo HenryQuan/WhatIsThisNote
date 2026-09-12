@@ -77,6 +77,9 @@ class _HomePageState extends State<HomePage> {
   /// Middle line of the treble staff (B4).
   int _step = 4;
 
+  /// Width of the wide-layout controls rail, dragged by the user.
+  double _sidebarWidth = 380;
+
   void _setStep(int step) {
     setState(() => _step = step.clamp(kMinStaffStep, kMaxStaffStep));
   }
@@ -411,99 +414,136 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    StaffView(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // On a wide window the controls move into a right-hand rail so
+              // the staff can use the full height instead of being squeezed
+              // above a full-width control panel. Guided and practice are
+              // focused modes and stay at the bottom even when wide.
+              final sidebar = constraints.maxWidth >= 900;
+              final modePanel = _guided || (_practice && _question != null);
+
+              final staff = Stack(
+                fit: StackFit.expand,
+                children: [
+                  StaffView(
+                    clef: _clef,
+                    keySignature: _key,
+                    step: _step,
+                    chordSteps: chord?.staffSteps(_step) ?? const [],
+                    targetStep: _guidedTarget,
+                    showLabel:
+                        widget.display.showStaffLabel &&
+                        (!_practice || _answered != null),
+                    interactive: !_practice,
+                    naming: widget.display.naming,
+                    showEnharmonic: widget.display.showEnharmonic,
+                    semanticValue: (!_practice || _answered != null)
+                        ? note.name
+                        : null,
+                    onStepChanged: (step) {
+                      if (step != _step) setState(() => _step = step);
+                    },
+                  ),
+                  if (widget.showCoachMark && !_practice && !_guided)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 12,
+                      child: _CoachMark(
+                        onDismiss: widget.onCoachMarkDismissed ?? () {},
+                      ),
+                    ),
+                ],
+              );
+
+              final panel = _guided
+                  ? _GuidedPanel(
+                      key: const Key('guided-panel'),
+                      lesson: _lesson,
+                      step: _lessonStep,
+                      lessonIndex: _lessonIndex,
+                      stepIndex: _stepIndex,
+                      totalSteps: _totalSteps,
+                      completedSteps: _completedSteps,
+                      isLastStep: _isLastStep,
+                      matched: _practiceMatched,
+                      onBack: _previousLessonStep,
+                      onNext: _nextLessonStep,
+                      onExit: _exitGuided,
+                    )
+                  : (_practice && _question != null)
+                  ? _PracticePanel(
+                      key: const Key('practice-panel'),
+                      question: _question!,
+                      answered: _answered,
+                      attempts: _attempts,
+                      correctAnswers: _correctAnswers,
+                      streak: _streak,
+                      bestStreak: _bestStreak,
+                      onAnswer: _answerPractice,
+                      onNext: _nextPracticeQuestion,
+                      onReset: _resetPracticeScore,
+                      onExit: _exitPractice,
+                    )
+                  : _Controls(
+                      key: const Key('controls'),
+                      sidebar: sidebar,
                       clef: _clef,
                       keySignature: _key,
+                      display: widget.display,
+                      scale: scale,
+                      chord: chord,
+                      chordScale: chordScale,
+                      chordMode: _chordMode,
+                      inversion: chord?.inversion ?? 0,
+                      progression: _progression,
                       step: _step,
-                      chordSteps: chord?.staffSteps(_step) ?? const [],
-                      targetStep: _guidedTarget,
-                      showLabel:
-                          widget.display.showStaffLabel &&
-                          (!_practice || _answered != null),
-                      interactive: !_practice,
-                      naming: widget.display.naming,
-                      showEnharmonic: widget.display.showEnharmonic,
-                      semanticValue: (!_practice || _answered != null)
-                          ? note.name
-                          : null,
-                      onStepChanged: (step) {
-                        if (step != _step) setState(() => _step = step);
-                      },
-                    ),
-                    if (widget.showCoachMark && !_practice && !_guided)
-                      Positioned(
-                        left: 16,
-                        right: 16,
-                        bottom: 12,
-                        child: _CoachMark(
-                          onDismiss: widget.onCoachMarkDismissed ?? () {},
-                        ),
-                      ),
+                      onPlay: () => _playSound(note, chord),
+                      onClefChanged: (clef) => setState(() => _clef = clef),
+                      onKeyChanged: (key) => setState(() => _key = key),
+                      onScaleTypeChanged: (type) =>
+                          setState(() => _scaleType = type),
+                      onChordModeChanged: _setChordMode,
+                      onInversionChanged: (value) =>
+                          setState(() => _inversion = value),
+                      onProgressionChanged: (value) =>
+                          setState(() => _progression = value),
+                      onDegreeSelected: _moveToDegree,
+                      onStepChanged: _setStep,
+                    );
+
+              if (!sidebar || modePanel) {
+                return Column(
+                  children: [
+                    Expanded(child: staff),
+                    panel,
                   ],
-                ),
-              ),
-              if (_guided)
-                _GuidedPanel(
-                  key: const Key('guided-panel'),
-                  lesson: _lesson,
-                  step: _lessonStep,
-                  lessonIndex: _lessonIndex,
-                  stepIndex: _stepIndex,
-                  totalSteps: _totalSteps,
-                  completedSteps: _completedSteps,
-                  isLastStep: _isLastStep,
-                  matched: _practiceMatched,
-                  onBack: _previousLessonStep,
-                  onNext: _nextLessonStep,
-                  onExit: _exitGuided,
-                )
-              else if (_practice && _question != null)
-                _PracticePanel(
-                  key: const Key('practice-panel'),
-                  question: _question!,
-                  answered: _answered,
-                  attempts: _attempts,
-                  correctAnswers: _correctAnswers,
-                  streak: _streak,
-                  bestStreak: _bestStreak,
-                  onAnswer: _answerPractice,
-                  onNext: _nextPracticeQuestion,
-                  onReset: _resetPracticeScore,
-                  onExit: _exitPractice,
-                )
-              else
-                _Controls(
-                  key: const Key('controls'),
-                  clef: _clef,
-                  keySignature: _key,
-                  display: widget.display,
-                  scale: scale,
-                  chord: chord,
-                  chordScale: chordScale,
-                  chordMode: _chordMode,
-                  inversion: chord?.inversion ?? 0,
-                  progression: _progression,
-                  step: _step,
-                  onPlay: () => _playSound(note, chord),
-                  onClefChanged: (clef) => setState(() => _clef = clef),
-                  onKeyChanged: (key) => setState(() => _key = key),
-                  onScaleTypeChanged: (type) =>
-                      setState(() => _scaleType = type),
-                  onChordModeChanged: _setChordMode,
-                  onInversionChanged: (value) =>
-                      setState(() => _inversion = value),
-                  onProgressionChanged: (value) =>
-                      setState(() => _progression = value),
-                  onDegreeSelected: _moveToDegree,
-                  onStepChanged: _setStep,
-                ),
-            ],
+                );
+              }
+
+              final maxSidebarWidth = (constraints.maxWidth - 420).clamp(
+                320.0,
+                820.0,
+              );
+              final sidebarWidth = _sidebarWidth.clamp(280.0, maxSidebarWidth);
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: staff),
+                  _SidebarResizer(
+                    onDrag: (dx) => setState(() {
+                      _sidebarWidth = (_sidebarWidth - dx).clamp(
+                        280.0,
+                        maxSidebarWidth,
+                      );
+                    }),
+                  ),
+                  SizedBox(width: sidebarWidth, child: panel),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -519,6 +559,36 @@ class _HomePageState extends State<HomePage> {
       case ThemeMode.system:
         return Icons.brightness_auto;
     }
+  }
+}
+
+/// The draggable divider between the staff and the controls rail. Dragging it
+/// left widens the rail and dragging it right shrinks it.
+class _SidebarResizer extends StatelessWidget {
+  const _SidebarResizer({required this.onDrag});
+
+  /// Called with the horizontal drag delta (positive when dragging right).
+  final ValueChanged<double> onDrag;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (details) => onDrag(details.delta.dx),
+        child: Semantics(
+          label: 'Resize controls panel',
+          child: SizedBox(
+            width: 12,
+            child: Center(
+              child: Container(width: 1, color: scheme.outlineVariant),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -928,6 +998,7 @@ class _PracticePanel extends StatelessWidget {
 class _Controls extends StatelessWidget {
   const _Controls({
     super.key,
+    this.sidebar = false,
     required this.clef,
     required this.keySignature,
     required this.display,
@@ -948,6 +1019,10 @@ class _Controls extends StatelessWidget {
     required this.onDegreeSelected,
     required this.onStepChanged,
   });
+
+  /// Whether the panel is shown as a full-height rail beside the staff
+  /// instead of a bar below it.
+  final bool sidebar;
 
   final Clef clef;
   final MusicalKey keySignature;
@@ -1001,8 +1076,9 @@ class _Controls extends StatelessWidget {
 
     // Tablets and desktop windows get a compact layout: the keyboard shares
     // the readout row and the selectors wrap into one or two lines, leaving
-    // more of the screen for the staff.
-    final wide = MediaQuery.sizeOf(context).width >= 720;
+    // more of the screen for the staff. In the sidebar the rail is narrow, so
+    // the stacked layout is used regardless of the window width.
+    final wide = !sidebar && MediaQuery.sizeOf(context).width >= 720;
 
     final clefSelector = SegmentedButton<Clef>(
       showSelectedIcon: false,
@@ -1037,7 +1113,9 @@ class _Controls extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+        maxHeight: sidebar
+            ? double.infinity
+            : MediaQuery.sizeOf(context).height * 0.72,
       ),
       child: SingleChildScrollView(
         child: Padding(
@@ -1144,7 +1222,7 @@ class _Controls extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 scale == null
-                                    ? 'numbered notation (1 = Do … 8 = Do)'
+                                    ? '1 = Do ... 8 = Do'
                                     : '${scale!.label} · '
                                           '${inScale ? 'degree $scaleDegree' : 'outside scale'}',
                                 key: const Key('note-scale-caption'),
@@ -1213,6 +1291,7 @@ class _Controls extends StatelessWidget {
               const SizedBox(height: 12),
               if (wide)
                 Wrap(
+                  alignment: WrapAlignment.end,
                   spacing: 8,
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
@@ -1221,9 +1300,9 @@ class _Controls extends StatelessWidget {
                     SizedBox(width: 280, child: keySelector),
                     SizedBox(width: 260, child: scaleSelector),
                     SizedBox(width: 220, child: chordSelector),
-                    if (chordMode != ChordMode.off) inversionSelector,
                     if (chordMode != ChordMode.off)
                       SizedBox(width: 300, child: progressionSelector),
+                    if (chordMode != ChordMode.off) inversionSelector,
                   ],
                 )
               else ...[
@@ -1231,13 +1310,20 @@ class _Controls extends StatelessWidget {
                 const SizedBox(height: 8),
                 keySelector,
                 const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(child: scaleSelector),
-                    const SizedBox(width: 8),
-                    Expanded(child: chordSelector),
-                  ],
-                ),
+                // In the rail the selectors are full-width so their labels
+                // never have to truncate; the phone layout keeps them paired.
+                if (sidebar) ...[
+                  scaleSelector,
+                  const SizedBox(height: 8),
+                  chordSelector,
+                ] else
+                  Row(
+                    children: [
+                      Expanded(child: scaleSelector),
+                      const SizedBox(width: 8),
+                      Expanded(child: chordSelector),
+                    ],
+                  ),
                 if (chordMode != ChordMode.off) ...[
                   const SizedBox(height: 8),
                   inversionSelector,
@@ -1251,6 +1337,10 @@ class _Controls extends StatelessWidget {
                   progression: progression!,
                   scale: chordScale,
                   seventh: chordMode == ChordMode.sevenths,
+                  alignment: wide
+                      ? MainAxisAlignment.end
+                      : MainAxisAlignment.start,
+                  wrap: sidebar,
                   onSelected: onDegreeSelected,
                 ),
               ],
@@ -1309,26 +1399,34 @@ class _KeySelector extends StatelessWidget {
           children: [
             const Icon(Icons.piano, size: 18),
             const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                'Key: ${value.label}',
-                key: const Key('key-label'),
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Key: ${value.label}',
+                      key: const Key('key-label'),
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      value.signatureLabel,
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                value.signatureLabel,
-                textAlign: TextAlign.right,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
             const Icon(Icons.arrow_drop_down),
           ],
         ),
@@ -1524,6 +1622,8 @@ class _ProgressionChips extends StatelessWidget {
     required this.scale,
     required this.seventh,
     required this.onSelected,
+    this.alignment = MainAxisAlignment.start,
+    this.wrap = false,
   });
 
   final ChordProgression progression;
@@ -1531,29 +1631,61 @@ class _ProgressionChips extends StatelessWidget {
   final bool seventh;
   final ValueChanged<int> onSelected;
 
+  /// How the chips are aligned when they do not fill the row.
+  final MainAxisAlignment alignment;
+
+  /// Whether the chips flow onto multiple lines instead of scrolling
+  /// horizontally. Used in the narrow controls rail so no chip is ever cut
+  /// off at the edge.
+  final bool wrap;
+
+  List<Widget> _buildChips() => [
+    for (var i = 0; i < progression.degrees.length; i++)
+      ActionChip(
+        key: Key('prog-$i'),
+        visualDensity: VisualDensity.compact,
+        label: Text(
+          Chord.diatonic(
+            scale,
+            progression.degrees[i],
+            seventh: seventh,
+          ).romanNumeral,
+        ),
+        onPressed: () => onSelected(progression.degrees[i]),
+      ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      key: const Key('progression-chips'),
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (var i = 0; i < progression.degrees.length; i++) ...[
-            if (i > 0) const SizedBox(width: 8),
-            ActionChip(
-              key: Key('prog-$i'),
-              visualDensity: VisualDensity.compact,
-              label: Text(
-                Chord.diatonic(
-                  scale,
-                  progression.degrees[i],
-                  seventh: seventh,
-                ).romanNumeral,
-              ),
-              onPressed: () => onSelected(progression.degrees[i]),
-            ),
-          ],
-        ],
+    final chips = _buildChips();
+    if (wrap) {
+      return Wrap(
+        key: const Key('progression-chips'),
+        spacing: 8,
+        runSpacing: 8,
+        alignment: alignment == MainAxisAlignment.end
+            ? WrapAlignment.end
+            : WrapAlignment.start,
+        children: chips,
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        key: const Key('progression-chips'),
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: alignment,
+            children: [
+              for (var i = 0; i < chips.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                chips[i],
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
