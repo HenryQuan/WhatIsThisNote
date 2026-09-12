@@ -383,6 +383,9 @@ class _HomePageState extends State<HomePage> {
                     interactive: !_practice,
                     naming: widget.display.naming,
                     showEnharmonic: widget.display.showEnharmonic,
+                    semanticValue: (!_practice || _answered != null)
+                        ? note.name
+                        : null,
                     onStepChanged: (step) {
                       if (step != _step) setState(() => _step = step);
                     },
@@ -486,32 +489,49 @@ class _CoachMark extends StatelessWidget {
       label:
           'Onboarding. Drag the note up or down to change its pitch, or tap '
           'a line to jump to it.',
-      child: Material(
-        key: const Key('onboarding-coach'),
-        color: scheme.inverseSurface,
-        elevation: 6,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-          child: Row(
-            children: [
-              Icon(Icons.touch_app, color: scheme.onInverseSurface),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Drag the note up or down to change pitch. Tap a line to '
-                  'jump there.',
-                  style: TextStyle(color: scheme.onInverseSurface),
+      child: Stack(
+        children: [
+          // The card body lets gestures fall through to the staff underneath;
+          // only the "Got it" button is interactive, so the coach mark never
+          // blocks the very gesture it is teaching.
+          IgnorePointer(
+            child: Material(
+              key: const Key('onboarding-coach'),
+              color: scheme.inverseSurface,
+              elevation: 6,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                child: Row(
+                  children: [
+                    Icon(Icons.touch_app, color: scheme.onInverseSurface),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Drag the note up or down to change pitch. Tap a line '
+                        'to jump there.',
+                        style: TextStyle(color: scheme.onInverseSurface),
+                      ),
+                    ),
+                    const SizedBox(width: 84),
+                  ],
                 ),
               ),
-              TextButton(
+            ),
+          ),
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: TextButton(
                 key: const Key('onboarding-dismiss'),
                 onPressed: onDismiss,
                 child: const Text('Got it'),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -954,13 +974,16 @@ class _Controls extends StatelessWidget {
                           textBaseline: TextBaseline.alphabetic,
                           children: [
                             Flexible(
-                              child: Text(
-                                primaryName,
-                                key: const Key('note-name'),
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.displaySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.primary,
+                              child: Semantics(
+                                liveRegion: true,
+                                child: Text(
+                                  primaryName,
+                                  key: const Key('note-name'),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.displaySmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                 ),
                               ),
                             ),

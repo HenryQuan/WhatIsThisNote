@@ -8,6 +8,8 @@ import 'package:whatisthisnote/audio/tone.dart';
 import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
+import 'package:whatisthisnote/core/display_preferences.dart';
+import 'package:whatisthisnote/core/display_preferences_store.dart';
 import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/lesson.dart';
 import 'package:whatisthisnote/core/note.dart';
@@ -646,6 +648,49 @@ void main() {
       expect(await store.hasSeenCoachMark(), isFalse);
       await store.markCoachMarkSeen();
       expect(store.seen, isTrue);
+    });
+  });
+
+  group('DisplayPreferencesStore', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('shared preferences store loads the built-in defaults', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final store = SharedPreferencesDisplayPreferencesStore();
+
+      expect(await store.load(), const DisplayPreferences());
+    });
+
+    test('shared preferences store round-trips preferences', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final store = SharedPreferencesDisplayPreferencesStore();
+      const preferences = DisplayPreferences(
+        naming: NamingSystem.solfege,
+        showStaffLabel: false,
+        showEnharmonic: true,
+      );
+
+      await store.save(preferences);
+
+      expect(await store.load(), preferences);
+    });
+
+    test('an unknown stored naming system falls back to scientific', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({'display_naming': 'bogus'});
+      final store = SharedPreferencesDisplayPreferencesStore();
+
+      expect((await store.load()).naming, NamingSystem.scientific);
+    });
+
+    test('in-memory store starts from defaults and remembers saves', () async {
+      final store = InMemoryDisplayPreferencesStore();
+      expect(await store.load(), const DisplayPreferences());
+
+      const preferences = DisplayPreferences(showEnharmonic: true);
+      await store.save(preferences);
+
+      expect(await store.load(), preferences);
     });
   });
 }

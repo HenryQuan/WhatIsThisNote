@@ -25,7 +25,10 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 - [x] Numbered notation (jianpu) degree next to the name, 1 = Do ... 7 = Ti
 - [x] Display preferences: pick the naming system (scientific, solfege or
       numbered), toggle the on-staff name label and show the enharmonic twin
-      (F♯ ~ G♭)
+      (F♯ ~ G♭). Saved between sessions with `shared_preferences`
+- [x] Accessibility: the staff and note are labelled for screen readers (the
+      answer stays hidden in practice), arrow keys nudge the note on a
+      keyboard, and "reduce motion" makes the snap instant
 - [x] Mini piano keyboard showing which key the note is on
 - [x] Hear the note, or the current chord, with a built-in synthesizer (no audio assets)
 - [x] Treble, bass and alto clefs

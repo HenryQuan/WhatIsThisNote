@@ -4,16 +4,25 @@ import 'package:flutter/material.dart';
 
 import 'audio/note_player.dart';
 import 'core/display_preferences.dart';
+import 'core/display_preferences_store.dart';
 import 'core/onboarding.dart';
 import 'ui/page/home_page.dart';
 import 'ui/theme.dart';
 
 void main() => runApp(
-  WhatIsThisNoteApp(onboardingStore: SharedPreferencesOnboardingStore()),
+  WhatIsThisNoteApp(
+    onboardingStore: SharedPreferencesOnboardingStore(),
+    displayPreferencesStore: SharedPreferencesDisplayPreferencesStore(),
+  ),
 );
 
 class WhatIsThisNoteApp extends StatefulWidget {
-  const WhatIsThisNoteApp({super.key, this.notePlayer, this.onboardingStore});
+  const WhatIsThisNoteApp({
+    super.key,
+    this.notePlayer,
+    this.onboardingStore,
+    this.displayPreferencesStore,
+  });
 
   /// Overrides the audio player, used by tests to avoid the native plugin.
   final NotePlayer? notePlayer;
@@ -22,6 +31,9 @@ class WhatIsThisNoteApp extends StatefulWidget {
   /// reports the mark as already seen, so tests and previews stay clean.
   final OnboardingStore? onboardingStore;
 
+  /// Persists the display preferences. Defaults to an in-memory store.
+  final DisplayPreferencesStore? displayPreferencesStore;
+
   @override
   State<WhatIsThisNoteApp> createState() => _WhatIsThisNoteAppState();
 }
@@ -29,12 +41,14 @@ class WhatIsThisNoteApp extends StatefulWidget {
 class _WhatIsThisNoteAppState extends State<WhatIsThisNoteApp> {
   ThemeMode _themeMode = ThemeMode.system;
 
-  /// Display preferences. Held here (not persisted yet) so a future
-  /// `shared_preferences` load/save only has to touch this one place.
+  /// Display preferences, restored from and saved to [_displayStore].
   DisplayPreferences _display = const DisplayPreferences();
 
   late final OnboardingStore _onboardingStore =
       widget.onboardingStore ?? InMemoryOnboardingStore();
+
+  late final DisplayPreferencesStore _displayStore =
+      widget.displayPreferencesStore ?? InMemoryDisplayPreferencesStore();
 
   bool _showCoachMark = false;
 
@@ -45,6 +59,15 @@ class _WhatIsThisNoteAppState extends State<WhatIsThisNoteApp> {
       if (!mounted || seen) return;
       setState(() => _showCoachMark = true);
     });
+    _displayStore.load().then((display) {
+      if (!mounted || display == _display) return;
+      setState(() => _display = display);
+    });
+  }
+
+  void _changeDisplay(DisplayPreferences display) {
+    setState(() => _display = display);
+    _displayStore.save(display);
   }
 
   void _dismissCoachMark() {
@@ -73,7 +96,7 @@ class _WhatIsThisNoteAppState extends State<WhatIsThisNoteApp> {
             themeMode: _themeMode,
             onThemeModeChanged: (mode) => setState(() => _themeMode = mode),
             display: _display,
-            onDisplayChanged: (display) => setState(() => _display = display),
+            onDisplayChanged: _changeDisplay,
             notePlayer: widget.notePlayer,
             showCoachMark: _showCoachMark,
             onCoachMarkDismissed: _dismissCoachMark,

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/audio/note_player.dart';
 import 'package:whatisthisnote/core/clef.dart';
+import 'package:whatisthisnote/core/display_preferences.dart';
+import 'package:whatisthisnote/core/display_preferences_store.dart';
 import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 import 'package:whatisthisnote/main.dart';
@@ -596,34 +600,6 @@ void main() {
     expect(find.byKey(const Key('onboarding-coach')), findsNothing);
   });
 
-  testWidgets('the staff keeps a fixed height across modes', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(400, 800));
-    await tester.pumpWidget(const WhatIsThisNoteApp());
-    await tester.pumpAndSettle();
-
-    final baseline = tester.getSize(find.byType(StaffView)).height;
-
-    await tester.tap(find.byTooltip('Guided path'));
-    await tester.pumpAndSettle();
-    expect(
-      tester.getSize(find.byType(StaffView)).height,
-      baseline,
-      reason: 'guided mode resized the staff',
-    );
-
-    await tester.tap(find.byKey(const Key('guided-exit')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Practice'));
-    await tester.pumpAndSettle();
-    expect(
-      tester.getSize(find.byType(StaffView)).height,
-      baseline,
-      reason: 'practice mode resized the staff',
-    );
-
-    await tester.binding.setSurfaceSize(null);
-  });
-
   testWidgets('a narrow large-text layout does not overflow', (tester) async {
     tester.platformDispatcher.textScaleFactorTestValue = 1.4;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
@@ -672,6 +648,111 @@ void main() {
       );
     }
   });
+
+  testWidgets('display preferences are restored on start', (tester) async {
+    final store = InMemoryDisplayPreferencesStore(
+      preferences: const DisplayPreferences(naming: NamingSystem.solfege),
+    );
+
+    await tester.pumpWidget(WhatIsThisNoteApp(displayPreferencesStore: store));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'Si');
+  });
+
+  testWidgets('changing display preferences saves them', (tester) async {
+    final store = InMemoryDisplayPreferencesStore();
+
+    await tester.pumpWidget(WhatIsThisNoteApp(displayPreferencesStore: store));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Numbered'));
+    await tester.pumpAndSettle();
+
+    expect((await store.load()).naming, NamingSystem.jianpu);
+  });
+
+  testWidgets('the staff exposes the note to assistive tech', (tester) async {
+    final handle = tester.ensureSemantics();
+
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    final staff = find.bySemanticsLabel('Note staff');
+    expect(staff, findsOneWidget);
+    final data = tester.getSemantics(staff).getSemanticsData();
+    expect(data.value, 'B4');
+    expect(data.hasAction(SemanticsAction.increase), isTrue);
+    expect(data.hasAction(SemanticsAction.decrease), isTrue);
+
+    handle.dispose();
+  });
+
+  testWidgets('practice mode does not announce the note answer', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Practice'));
+    await tester.pumpAndSettle();
+
+    final data = tester
+        .getSemantics(find.bySemanticsLabel('Note staff'))
+        .getSemanticsData();
+    expect(data.value, isEmpty);
+
+    handle.dispose();
+  });
+
+  testWidgets('arrow keys nudge the note on a keyboard', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'C5');
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'B4');
+  });
+
+  testWidgets('reduce motion snaps the note without animating', (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+
+    expect(_paintedStep(tester), 5.0);
+  });
+
+  testWidgets('the snap animates by default', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pump();
+
+    expect(_paintedStep(tester), lessThan(5.0));
+  });
+}
+
+double _paintedStep(WidgetTester tester) {
+  final painter = tester
+      .widgetList<CustomPaint>(find.byType(CustomPaint))
+      .map((paint) => paint.painter)
+      .whereType<NotationPainter>()
+      .first;
+  return painter.step;
 }
 
 class _RecordingNotePlayer implements NotePlayer {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
@@ -24,6 +25,7 @@ class StaffView extends StatefulWidget {
     this.interactive = true,
     this.naming = NamingSystem.scientific,
     this.showEnharmonic = false,
+    this.semanticValue,
   });
 
   final Clef clef;
@@ -57,6 +59,10 @@ class StaffView extends StatefulWidget {
   final NamingSystem naming;
   final bool showEnharmonic;
 
+  /// The note name announced to screen readers, for example `B4`. The staff
+  /// otherwise draws the note as a glyph that assistive tech cannot read.
+  final String? semanticValue;
+
   @override
   State<StaffView> createState() => _StaffViewState();
 }
@@ -73,6 +79,9 @@ class _StaffViewState extends State<StaffView>
   double _noteX = -1;
 
   bool _dragging = false;
+
+  /// Keeps the staff focusable so arrow keys can nudge the note on desktop.
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -103,8 +112,40 @@ class _StaffViewState extends State<StaffView>
 
   void _animateTo(double target) {
     _controller.stop();
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      setState(() => _currentStep = target);
+      return;
+    }
     _tween = Tween<double>(begin: _currentStep, end: target);
     _controller.forward(from: 0);
+  }
+
+  /// Moves the note by [delta] staff steps, clamped to the allowed range.
+  void _nudge(int delta) {
+    final target = (widget.step + delta).clamp(widget.minStep, widget.maxStep);
+    if (target != widget.step) widget.onStepChanged(target);
+  }
+
+  /// Scientific name of the note at [step], used for the semantics
+  /// `increasedValue`/`decreasedValue` that assistive tech announces.
+  String _semanticNameAt(int step) {
+    final clamped = step.clamp(widget.minStep, widget.maxStep);
+    return widget.keySignature.applyTo(widget.clef.noteAt(clamped)).name;
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _nudge(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _nudge(-1);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void _onPanStart(DragStartDetails details) {
@@ -168,6 +209,7 @@ class _StaffViewState extends State<StaffView>
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -205,14 +247,48 @@ class _StaffViewState extends State<StaffView>
             targetColor: scheme.outline,
           ),
         );
-        if (!widget.interactive) return staff;
-        return GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanStart: _onPanStart,
-          onPanUpdate: (details) => _onPanUpdate(geometry, details),
-          onPanEnd: (_) => _onPanEnd(geometry),
-          onTapUp: (details) => _onTapUp(geometry, details),
-          child: staff,
+        if (!widget.interactive) {
+          return Semantics(
+            image: true,
+            label: widget.semanticValue == null
+                ? 'Note staff'
+                : 'Note staff, ${widget.semanticValue}',
+            child: staff,
+          );
+        }
+        final value = widget.semanticValue;
+        return Focus(
+          focusNode: _focusNode,
+          autofocus: true,
+          onKeyEvent: _onKeyEvent,
+          child: Semantics(
+            container: true,
+            label: 'Note staff',
+            value: value,
+            increasedValue: value == null
+                ? null
+                : _semanticNameAt(widget.step + 1),
+            decreasedValue: value == null
+                ? null
+                : _semanticNameAt(widget.step - 1),
+            hint:
+                'Drag up or down to change the pitch, or tap a line to jump '
+                'there. Use the arrow keys on a keyboard.',
+            onIncrease: value == null ? null : () => _nudge(1),
+            onDecrease: value == null ? null : () => _nudge(-1),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => _focusNode.requestFocus(),
+              onPanStart: (details) {
+                _focusNode.requestFocus();
+                _onPanStart(details);
+              },
+              onPanUpdate: (details) => _onPanUpdate(geometry, details),
+              onPanEnd: (_) => _onPanEnd(geometry),
+              onTapUp: (details) => _onTapUp(geometry, details),
+              child: staff,
+            ),
+          ),
         );
       },
     );
