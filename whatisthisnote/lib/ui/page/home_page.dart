@@ -5,6 +5,7 @@ import '../../core/clef.dart';
 import '../../core/key.dart';
 import '../../core/lesson.dart';
 import '../../core/note.dart';
+import '../../core/quiz.dart';
 import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
 import '../widgets/piano_keyboard.dart';
@@ -42,6 +43,16 @@ class _HomePageState extends State<HomePage> {
   bool _guided = false;
   int _lessonIndex = 0;
   int _stepIndex = 0;
+
+  /// Optional practice mode (name-the-note quiz), off by default.
+  bool _practice = false;
+  QuizBuilder? _quizBuilder;
+  QuizQuestion? _question;
+  String? _answered;
+  int _attempts = 0;
+  int _correctAnswers = 0;
+  int _streak = 0;
+  int _bestStreak = 0;
 
   /// Middle line of the treble staff (B4).
   int _step = 4;
@@ -148,6 +159,7 @@ class _HomePageState extends State<HomePage> {
   void _startGuided() {
     setState(() {
       _guided = true;
+      _practice = false;
       _lessonIndex = 0;
       _stepIndex = 0;
     });
@@ -155,6 +167,61 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _exitGuided() => setState(() => _guided = false);
+
+  /// Enters practice mode: a separate mode that hides the answer and quizzes
+  /// the learner on the note drawn on the staff.
+  void _startPractice() {
+    setState(() {
+      _practice = true;
+      _guided = false;
+      _scaleType = null;
+      _chordMode = ChordMode.off;
+      _progression = null;
+      _quizBuilder = QuizBuilder(clef: _clef, key: _key);
+      _attempts = 0;
+      _correctAnswers = 0;
+      _streak = 0;
+      _bestStreak = 0;
+    });
+    _nextPracticeQuestion();
+  }
+
+  void _exitPractice() => setState(() => _practice = false);
+
+  void _nextPracticeQuestion() {
+    final question = _quizBuilder!.next();
+    setState(() {
+      _question = question;
+      _answered = null;
+      _step = question.step;
+    });
+  }
+
+  void _answerPractice(String choice) {
+    final question = _question;
+    if (_answered != null || question == null) return;
+    final correct = question.isCorrect(choice);
+    setState(() {
+      _answered = choice;
+      _attempts++;
+      if (correct) {
+        _correctAnswers++;
+        _streak++;
+        if (_streak > _bestStreak) _bestStreak = _streak;
+      } else {
+        _streak = 0;
+      }
+    });
+  }
+
+  void _resetPracticeScore() {
+    setState(() {
+      _attempts = 0;
+      _correctAnswers = 0;
+      _streak = 0;
+      _bestStreak = 0;
+    });
+  }
 
   void _nextLessonStep() {
     if (!_practiceMatched) return;
@@ -198,6 +265,12 @@ class _HomePageState extends State<HomePage> {
         title: const Text('What is this note?'),
         actions: [
           IconButton(
+            tooltip: 'Practice',
+            isSelected: _practice,
+            icon: const Icon(Icons.quiz),
+            onPressed: _practice ? _exitPractice : _startPractice,
+          ),
+          IconButton(
             tooltip: 'Guided path',
             isSelected: _guided,
             icon: const Icon(Icons.school),
@@ -238,6 +311,8 @@ class _HomePageState extends State<HomePage> {
                 step: _step,
                 chordSteps: chord?.staffSteps(_step) ?? const [],
                 targetStep: _guidedTarget,
+                showLabel: !_practice || _answered != null,
+                interactive: !_practice,
                 onStepChanged: (step) {
                   if (step != _step) setState(() => _step = step);
                 },
@@ -257,6 +332,20 @@ class _HomePageState extends State<HomePage> {
                 onBack: _previousLessonStep,
                 onNext: _nextLessonStep,
                 onExit: _exitGuided,
+              )
+            else if (_practice && _question != null)
+              _PracticePanel(
+                key: const Key('practice-panel'),
+                question: _question!,
+                answered: _answered,
+                attempts: _attempts,
+                correctAnswers: _correctAnswers,
+                streak: _streak,
+                bestStreak: _bestStreak,
+                onAnswer: _answerPractice,
+                onNext: _nextPracticeQuestion,
+                onReset: _resetPracticeScore,
+                onExit: _exitPractice,
               )
             else
               _Controls(
@@ -433,6 +522,206 @@ class _GuidedPanel extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The panel shown in practice mode. It replaces the manual controls with a
+/// name-the-note quiz: the staff hides the answer and the learner picks the
+/// name from four choices.
+class _PracticePanel extends StatelessWidget {
+  const _PracticePanel({
+    super.key,
+    required this.question,
+    required this.answered,
+    required this.attempts,
+    required this.correctAnswers,
+    required this.streak,
+    required this.bestStreak,
+    required this.onAnswer,
+    required this.onNext,
+    required this.onReset,
+    required this.onExit,
+  });
+
+  final QuizQuestion question;
+  final String? answered;
+  final int attempts;
+  final int correctAnswers;
+  final int streak;
+  final int bestStreak;
+  final ValueChanged<String> onAnswer;
+  final VoidCallback onNext;
+  final VoidCallback onReset;
+  final VoidCallback onExit;
+
+  bool get _revealed => answered != null;
+  bool get _wasCorrect => _revealed && question.isCorrect(answered!);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.quiz, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Practice',
+                      key: const Key('practice-title'),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  if (streak > 0) ...[
+                    Icon(
+                      Icons.local_fire_department,
+                      size: 18,
+                      color: scheme.tertiary,
+                    ),
+                    Text(
+                      '$streak',
+                      key: const Key('practice-streak'),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: scheme.tertiary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Text(
+                    '$correctAnswers / $attempts',
+                    key: const Key('practice-score'),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  IconButton(
+                    key: const Key('practice-exit'),
+                    tooltip: 'Exit practice',
+                    icon: const Icon(Icons.close),
+                    onPressed: onExit,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'What note is this?',
+                key: const Key('practice-prompt'),
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Pick the name of the note on the staff. '
+                'Best streak: $bestStreak.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final choice in question.choices)
+                    _answerButton(context, choice),
+                ],
+              ),
+              if (_revealed) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      _wasCorrect ? Icons.check_circle : Icons.cancel,
+                      size: 18,
+                      color: _wasCorrect ? scheme.primary : scheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _wasCorrect
+                            ? 'Correct! It is ${question.answer}.'
+                            : 'Not quite. It is ${question.answer}.',
+                        key: const Key('practice-feedback'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: _wasCorrect ? scheme.primary : scheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const Key('practice-reset'),
+                      onPressed: onReset,
+                      child: const Text('Reset'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      key: const Key('practice-next'),
+                      onPressed: _revealed ? onNext : null,
+                      child: const Text('Next note'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _answerButton(BuildContext context, String choice) {
+    final scheme = Theme.of(context).colorScheme;
+    final isAnswer = choice == question.answer;
+    final isPicked = choice == answered;
+    Color background;
+    Color foreground;
+    if (!_revealed) {
+      background = scheme.surfaceContainerHighest;
+      foreground = scheme.onSurface;
+    } else if (isAnswer) {
+      background = scheme.primary;
+      foreground = scheme.onPrimary;
+    } else if (isPicked) {
+      background = scheme.errorContainer;
+      foreground = scheme.onErrorContainer;
+    } else {
+      background = scheme.surfaceContainerHighest.withValues(alpha: 0.4);
+      foreground = scheme.onSurfaceVariant;
+    }
+    return FilledButton(
+      key: Key('practice-choice-$choice'),
+      onPressed: _revealed ? null : () => onAnswer(choice),
+      style: FilledButton.styleFrom(
+        backgroundColor: background,
+        foregroundColor: foreground,
+        disabledBackgroundColor: background,
+        disabledForegroundColor: foreground,
+        minimumSize: const Size(56, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+      ),
+      child: Text(
+        choice,
+        style: const TextStyle(fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -727,10 +1016,13 @@ class _KeySelector extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              value.signatureLabel,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            Flexible(
+              child: Text(
+                value.signatureLabel,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             const Icon(Icons.arrow_drop_down),

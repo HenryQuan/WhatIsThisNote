@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 import 'package:whatisthisnote/main.dart';
 import 'package:whatisthisnote/ui/painters/notation_painter.dart';
@@ -92,6 +93,55 @@ void main() {
     expect(find.text('no sharps or flats'), findsWidgets);
     expect(find.text('1 sharp \u00B7 F\u266F'), findsWidgets);
     expect(find.text('2 sharps \u00B7 F\u266F, C\u266F'), findsWidgets);
+  });
+
+  testWidgets('practice mode is a separate quiz mode', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    expect(find.byKey(const Key('controls')), findsOneWidget);
+    expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isTrue);
+
+    await tester.tap(find.byTooltip('Practice'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('controls')), findsNothing);
+    expect(find.byKey(const Key('practice-panel')), findsOneWidget);
+    expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isFalse);
+    expect(
+      tester.widget<StaffView>(find.byType(StaffView)).interactive,
+      isFalse,
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('practice-score'))).data,
+      '0 / 0',
+    );
+
+    final step = tester.widget<StaffView>(find.byType(StaffView)).step;
+    final answer = Clef.treble.noteAt(step).pitchName;
+    final choice = find.byKey(Key('practice-choice-$answer'));
+    await tester.ensureVisible(choice);
+    await tester.tap(choice);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('practice-score'))).data,
+      '1 / 1',
+    );
+    expect(find.byKey(const Key('practice-feedback')), findsOneWidget);
+    expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isTrue);
+
+    await tester.tap(find.byKey(const Key('practice-next')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('practice-score'))).data,
+      '1 / 1',
+    );
+    expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isFalse);
+
+    await tester.tap(find.byKey(const Key('practice-exit')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('controls')), findsOneWidget);
   });
 
   testWidgets('scale highlight is off by default and can be enabled', (

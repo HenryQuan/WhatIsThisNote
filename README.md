@@ -25,6 +25,8 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 
 ### Add-ons (off by default)
 
+- [x] Practice mode: a name-the-note quiz that hides the answer and asks you to
+      pick from four choices, with a running score and a streak
 - [x] Scale highlight: major, natural/harmonic/melodic minor, major/minor
       pentatonic and blues, tinted on the piano keyboard with the note's scale
       degree

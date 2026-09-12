@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/core/accidental.dart';
@@ -6,6 +8,7 @@ import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/lesson.dart';
 import 'package:whatisthisnote/core/note.dart';
+import 'package:whatisthisnote/core/quiz.dart';
 import 'package:whatisthisnote/core/scale.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 
@@ -407,6 +410,63 @@ void main() {
     test('lists playable progressions', () {
       expect(kProgressions, isNotEmpty);
       expect(kProgressions.first.degrees, [1, 5, 6, 4]);
+    });
+  });
+
+  group('Quiz', () {
+    test('builds distinct choices that include the answer', () {
+      final builder = QuizBuilder(
+        clef: Clef.treble,
+        key: kMajorKeys.first,
+        random: Random(1),
+      );
+      for (var i = 0; i < 50; i++) {
+        final question = builder.next();
+        expect(QuizBuilder.steps, contains(question.step));
+        expect(question.choices.length, QuizBuilder.choiceCount);
+        expect(question.choices.toSet().length, QuizBuilder.choiceCount);
+        expect(question.choices, contains(question.answer));
+        expect(question.isCorrect(question.answer), isTrue);
+        for (final choice in question.choices) {
+          if (choice != question.answer) {
+            expect(question.isCorrect(choice), isFalse);
+          }
+        }
+      }
+    });
+
+    test('uses the key signature accidentals in the choices', () {
+      final builder = QuizBuilder(
+        clef: Clef.treble,
+        key: MusicalKey('G', KeyMode.major, 1),
+        random: Random(2),
+      );
+      expect(builder.noteNames, contains('F\u266F'));
+      expect(builder.noteNames, isNot(contains('F')));
+    });
+
+    test('reads the answer with the clef', () {
+      final treble = QuizBuilder(
+        clef: Clef.treble,
+        key: kMajorKeys.first,
+        random: Random(3),
+      );
+      final bass = QuizBuilder(
+        clef: Clef.bass,
+        key: kMajorKeys.first,
+        random: Random(3),
+      );
+      final trebleQuestion = treble.next();
+      final bassQuestion = bass.next();
+      expect(trebleQuestion.step, bassQuestion.step);
+      expect(
+        trebleQuestion.answer,
+        Clef.treble.noteAt(trebleQuestion.step).pitchName,
+      );
+      expect(
+        bassQuestion.answer,
+        Clef.bass.noteAt(bassQuestion.step).pitchName,
+      );
     });
   });
 
