@@ -471,7 +471,11 @@ String _svgArt() {
 
 String _inkVector({required bool monochrome}) {
   final staffD = _staffPathData();
-  final staff = monochrome ? '#FF000000' : '#FFD0D5DD';
+  // A monochrome (themed) drawable must use one tint color; Android keeps the
+  // alpha channel and recolors it to the user's Material You palette. The
+  // staff keeps its lighter look through alpha instead of a second color.
+  final staff = monochrome ? '#66000000' : '#FFD0D5DD';
+  final note = monochrome ? '#FF000000' : _noteHex;
   return '<?xml version="1.0" encoding="utf-8"?>\n'
       '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
       '    android:width="108dp" android:height="108dp"\n'
@@ -482,11 +486,11 @@ String _inkVector({required bool monochrome}) {
       '        <path android:strokeColor="$staff" '
       'android:strokeWidth="${_n(_staffWidth)}" '
       'android:strokeLineCap="round" android:pathData="$staffD"/>\n'
-      '        <path android:strokeColor="$_noteHex" '
+      '        <path android:strokeColor="$note" '
       'android:strokeWidth="${_n(_stemWidth)}" '
       'android:strokeLineCap="round" '
       'android:pathData="M${_n(_stemX)} ${_n(_noteCY)}V${_n(_stemTop)}"/>\n'
-      '        <path android:fillColor="$_noteHex" '
+      '        <path android:fillColor="$note" '
       'android:pathData="${_ellipsePathData(_noteCX, _noteCY)}"/>\n'
       '    </group>\n'
       '</vector>\n';

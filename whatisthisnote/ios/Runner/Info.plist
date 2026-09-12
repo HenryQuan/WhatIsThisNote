@@ -15,7 +15,9 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>whatisthisnote</string>
+	<string>WhatIsThisNote</string>
+	<key>CFBundleDisplayName</key>
+	<string>WhatIsThisNote</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

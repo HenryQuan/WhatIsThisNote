@@ -6,15 +6,20 @@ class AppTheme {
 
   static const Color _seed = Color(0xFF4A6CF7);
 
-  static ThemeData light() => _build(Brightness.light);
+  /// Theme using Material You dynamic colors when [dynamicScheme] is available
+  /// (Android 12+/macOS), otherwise falling back to the brand seed color.
+  static ThemeData light([ColorScheme? dynamicScheme]) =>
+      _build(Brightness.light, dynamicScheme);
 
-  static ThemeData dark() => _build(Brightness.dark);
+  static ThemeData dark([ColorScheme? dynamicScheme]) =>
+      _build(Brightness.dark, dynamicScheme);
 
-  static ThemeData _build(Brightness brightness) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: _seed,
-      brightness: brightness,
-    );
+  static ThemeData _build(Brightness brightness, ColorScheme? dynamicScheme) {
+    final scheme = dynamicScheme ??
+        ColorScheme.fromSeed(
+          seedColor: _seed,
+          brightness: brightness,
+        );
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
