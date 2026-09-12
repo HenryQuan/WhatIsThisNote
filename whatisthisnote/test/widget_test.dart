@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/audio/note_player.dart';
 import 'package:whatisthisnote/core/clef.dart';
+import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 import 'package:whatisthisnote/main.dart';
 import 'package:whatisthisnote/ui/painters/notation_painter.dart';
@@ -549,6 +550,127 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('note-enharmonic'))).data,
       '\u2248 G\u266D5',
     );
+  });
+
+  testWidgets('the first-run coach mark shows once and can be dismissed', (
+    tester,
+  ) async {
+    final store = InMemoryOnboardingStore(seen: false);
+    await tester.pumpWidget(WhatIsThisNoteApp(onboardingStore: store));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('onboarding-coach')), findsOneWidget);
+    expect(store.seen, isFalse);
+
+    await tester.tap(find.byKey(const Key('onboarding-dismiss')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('onboarding-coach')), findsNothing);
+    expect(store.seen, isTrue);
+  });
+
+  testWidgets('the coach mark does not block dragging the note', (
+    tester,
+  ) async {
+    final store = InMemoryOnboardingStore(seen: false);
+    await tester.pumpWidget(WhatIsThisNoteApp(onboardingStore: store));
+    await tester.pumpAndSettle();
+
+    final staff = tester.getRect(find.byType(StaffView));
+    await tester.dragFrom(staff.center, const Offset(0, -80));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      isNot('B4'),
+    );
+    expect(find.byKey(const Key('onboarding-coach')), findsOneWidget);
+  });
+
+  testWidgets('no coach mark once it has been seen', (tester) async {
+    await tester.pumpWidget(
+      WhatIsThisNoteApp(onboardingStore: InMemoryOnboardingStore()),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('onboarding-coach')), findsNothing);
+  });
+
+  testWidgets('the staff keeps a fixed height across modes', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    final baseline = tester.getSize(find.byType(StaffView)).height;
+
+    await tester.tap(find.byTooltip('Guided path'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(find.byType(StaffView)).height,
+      baseline,
+      reason: 'guided mode resized the staff',
+    );
+
+    await tester.tap(find.byKey(const Key('guided-exit')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Practice'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(find.byType(StaffView)).height,
+      baseline,
+      reason: 'practice mode resized the staff',
+    );
+
+    await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('a narrow large-text layout does not overflow', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the controls fit without scrolling on a typical window', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    final controls = find.byKey(const Key('controls'));
+    final scrollable = find.descendant(
+      of: controls,
+      matching: find.byType(Scrollable),
+    );
+    expect(
+      tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
+      0,
+      reason: 'the controls panel should not need to scroll',
+    );
+
+    final baseline = tester.getSize(find.byType(StaffView)).height;
+    for (var i = 0; i < 12; i++) {
+      await tester.dragFrom(
+        tester.getRect(find.byType(StaffView)).center,
+        const Offset(0, -10),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byType(StaffView)).height,
+        baseline,
+        reason: 'dragging the note resized the staff',
+      );
+    }
   });
 }
 

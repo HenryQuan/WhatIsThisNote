@@ -330,6 +330,8 @@ class NotationPainter extends CustomPainter {
         old.labelColor != labelColor ||
         old.labelBackgroundColor != labelBackgroundColor ||
         old.showLabel != showLabel ||
+        old.naming != naming ||
+        old.showEnharmonic != showEnharmonic ||
         !listEquals(old.chordSteps, chordSteps) ||
         old.chordColor != chordColor ||
         old.targetStep != targetStep ||

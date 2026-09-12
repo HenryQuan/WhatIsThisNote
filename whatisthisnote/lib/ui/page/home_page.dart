@@ -24,6 +24,8 @@ class HomePage extends StatefulWidget {
     required this.display,
     required this.onDisplayChanged,
     this.notePlayer,
+    this.showCoachMark = false,
+    this.onCoachMarkDismissed,
   });
 
   final ThemeMode themeMode;
@@ -33,6 +35,12 @@ class HomePage extends StatefulWidget {
 
   /// Overrides the audio player, used by tests to avoid the native plugin.
   final NotePlayer? notePlayer;
+
+  /// Whether to show the one-time first-run coach mark over the staff.
+  final bool showCoachMark;
+
+  /// Called when the learner dismisses the coach mark.
+  final VoidCallback? onCoachMarkDismissed;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -360,21 +368,35 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           children: [
             Expanded(
-              child: StaffView(
-                clef: _clef,
-                keySignature: _key,
-                step: _step,
-                chordSteps: chord?.staffSteps(_step) ?? const [],
-                targetStep: _guidedTarget,
-                showLabel:
-                    widget.display.showStaffLabel &&
-                    (!_practice || _answered != null),
-                interactive: !_practice,
-                naming: widget.display.naming,
-                showEnharmonic: widget.display.showEnharmonic,
-                onStepChanged: (step) {
-                  if (step != _step) setState(() => _step = step);
-                },
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  StaffView(
+                    clef: _clef,
+                    keySignature: _key,
+                    step: _step,
+                    chordSteps: chord?.staffSteps(_step) ?? const [],
+                    targetStep: _guidedTarget,
+                    showLabel:
+                        widget.display.showStaffLabel &&
+                        (!_practice || _answered != null),
+                    interactive: !_practice,
+                    naming: widget.display.naming,
+                    showEnharmonic: widget.display.showEnharmonic,
+                    onStepChanged: (step) {
+                      if (step != _step) setState(() => _step = step);
+                    },
+                  ),
+                  if (widget.showCoachMark && !_practice && !_guided)
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 12,
+                      child: _CoachMark(
+                        onDismiss: widget.onCoachMarkDismissed ?? () {},
+                      ),
+                    ),
+                ],
               ),
             ),
             if (_guided)
@@ -446,6 +468,52 @@ class _HomePageState extends State<HomePage> {
       case ThemeMode.system:
         return Icons.brightness_auto;
     }
+  }
+}
+
+/// The one-time first-run coach mark shown over the staff. It explains the two
+/// core gestures and can be dismissed with a single tap.
+class _CoachMark extends StatelessWidget {
+  const _CoachMark({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      label:
+          'Onboarding. Drag the note up or down to change its pitch, or tap '
+          'a line to jump to it.',
+      child: Material(
+        key: const Key('onboarding-coach'),
+        color: scheme.inverseSurface,
+        elevation: 6,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          child: Row(
+            children: [
+              Icon(Icons.touch_app, color: scheme.onInverseSurface),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Drag the note up or down to change pitch. Tap a line to '
+                  'jump there.',
+                  style: TextStyle(color: scheme.onInverseSurface),
+                ),
+              ),
+              TextButton(
+                key: const Key('onboarding-dismiss'),
+                onPressed: onDismiss,
+                child: const Text('Got it'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -550,6 +618,8 @@ class _GuidedPanel extends StatelessWidget {
                             ? 'That is the note. Well done!'
                             : 'Drag the note to the hollow notehead.',
                         key: const Key('guided-status'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: matched
                               ? scheme.primary
@@ -912,20 +982,25 @@ class _Controls extends StatelessWidget {
                           ],
                         ),
                         if (secondaryNames.isNotEmpty)
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 2,
+                          Row(
                             children: [
-                              for (final (key, name) in secondaryNames)
-                                Text(
-                                  name,
-                                  key: key,
-                                  style: theme.textTheme.headlineSmall
-                                      ?.copyWith(
-                                        color:
-                                            theme.colorScheme.onSurfaceVariant,
-                                      ),
+                              for (var i = 0; i < secondaryNames.length; i++) ...[
+                                if (i > 0) const SizedBox(width: 12),
+                                Flexible(
+                                  child: Text(
+                                    secondaryNames[i].$2,
+                                    key: secondaryNames[i].$1,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.headlineSmall
+                                        ?.copyWith(
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
                                 ),
+                              ],
                             ],
                           ),
                         Text(

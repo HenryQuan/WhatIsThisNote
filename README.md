@@ -14,6 +14,11 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 - [x] Simple and clean Material 3 UI
 - [x] Drag or tap the note to change its pitch; it snaps to the nearest position
 - [x] Smooth snap animation
+- [x] First-run coach mark explaining the drag and tap gestures, shown once and
+      remembered with `shared_preferences`
+- [x] Stable layout: the staff fills the space the controls leave, and the
+      readout can never change the panel's height, so the view does not jump
+      while dragging
 - [x] Automatic ledger lines above and below the staff
 - [x] All 15 major and 15 minor key signatures, drawn on the staff
 - [x] Note names in scientific pitch (C, D, E...) and fixed-do solfege (Do, Re, Mi...)

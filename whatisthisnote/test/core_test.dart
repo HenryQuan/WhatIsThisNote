@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:whatisthisnote/audio/tone.dart';
 import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/chord.dart';
@@ -10,6 +11,7 @@ import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/lesson.dart';
 import 'package:whatisthisnote/core/note.dart';
+import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/quiz.dart';
 import 'package:whatisthisnote/core/scale.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
@@ -624,6 +626,26 @@ void main() {
         ),
         '4\u266F',
       );
+    });
+  });
+
+  group('OnboardingStore', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('remembers that the coach mark was seen', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final store = SharedPreferencesOnboardingStore();
+
+      expect(await store.hasSeenCoachMark(), isFalse);
+      await store.markCoachMarkSeen();
+      expect(await store.hasSeenCoachMark(), isTrue);
+    });
+
+    test('in-memory store reflects its initial and updated state', () async {
+      final store = InMemoryOnboardingStore(seen: false);
+      expect(await store.hasSeenCoachMark(), isFalse);
+      await store.markCoachMarkSeen();
+      expect(store.seen, isTrue);
     });
   });
 }
