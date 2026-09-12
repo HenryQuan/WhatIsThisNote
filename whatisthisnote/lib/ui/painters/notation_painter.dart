@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -234,8 +236,9 @@ class NotationPainter extends CustomPainter {
         text: note.pitchName,
         style: TextStyle(
           color: labelColor,
-          fontSize: geometry.space * 1.05,
+          fontSize: geometry.space * 0.95,
           fontWeight: FontWeight.w700,
+          height: 1.0,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -248,15 +251,12 @@ class NotationPainter extends CustomPainter {
     }
     final y = geometry.yForStep(labelStep.toDouble()) - painter.height / 2;
 
-    final pad = geometry.space * 0.25;
+    final pad = geometry.space * 0.16;
+    final height = painter.height + pad * 2;
+    final width = math.max(painter.width + pad * 2, height);
     final background = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        x - pad,
-        y - pad,
-        painter.width + pad * 2,
-        painter.height + pad * 2,
-      ),
-      Radius.circular(geometry.space * 0.3),
+      Rect.fromLTWH(x - (width - painter.width) / 2, y - pad, width, height),
+      Radius.circular(height / 2),
     );
     canvas.drawRRect(background, Paint()..color = labelBackgroundColor);
     painter.paint(canvas, Offset(x, y));
