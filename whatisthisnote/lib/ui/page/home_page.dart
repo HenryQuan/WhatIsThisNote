@@ -212,11 +212,16 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// How many steps [kind] plays. A scale gets one extra note so it ends on
-  /// the tonic an octave up.
-  int _sequenceLength(_Playback kind) => switch (kind) {
-    _Playback.highlight => (_scaleType?.degrees.length ?? 0) + 1,
-    _Playback.progression => _progression?.degrees.length ?? 0,
-  };
+  /// the tonic an octave up. Returns 0 when the required selection is missing.
+  int _sequenceLength(_Playback kind) {
+    switch (kind) {
+      case _Playback.highlight:
+        final type = _scaleType;
+        return type == null ? 0 : type.degrees.length + 1;
+      case _Playback.progression:
+        return _progression?.degrees.length ?? 0;
+    }
+  }
 
   /// Plays one step of the running sequence and schedules the next.
   void _playSequenceStep(int token, _Playback kind, int index) {
@@ -281,12 +286,13 @@ class _HomePageState extends State<HomePage> {
   /// The diatonic chord built on [note]'s scale degree, or `null` when the
   /// chord lab is off or [note] is not in [scale].
   Chord? _chordFor(Scale scale, Note note) {
-    if (_chordMode == ChordMode.off) return null;
+    final extension = _chordMode.extension;
+    if (extension == null) return null;
     if (!scale.pitchClasses.contains(note.midi % 12)) return null;
     return Chord.diatonic(
       scale,
       _degreeOf(note, scale),
-      seventh: _chordMode == ChordMode.sevenths,
+      extension: extension,
       inversion: _inversion,
     );
   }
@@ -295,7 +301,8 @@ class _HomePageState extends State<HomePage> {
     if (_playback != null) _stopSequence();
     setState(() {
       _chordMode = mode;
-      final max = mode == ChordMode.sevenths ? 3 : 2;
+      final tones = mode.extension?.toneCount ?? 0;
+      final max = tones == 0 ? 0 : (tones - 1).clamp(0, 3);
       if (_inversion > max) _inversion = 0;
       // Progression chips belong to the chord lab; clear the selection when
       // the lab is turned off so nothing stale renders in the rail.
@@ -574,7 +581,9 @@ class _HomePageState extends State<HomePage> {
                         ? note.name
                         : null,
                     onStepChanged: (step) {
-                      if (step != _step) setState(() => _step = step);
+                      if (step == _step) return;
+                      _stopSequence();
+                      setState(() => _step = step);
                     },
                   ),
                   if (widget.showCoachMark && !_practice && !_guided)
@@ -1324,7 +1333,7 @@ class _Controls extends StatelessWidget {
     );
     final inversionSelector = _InversionSelector(
       value: inversion,
-      count: chordMode == ChordMode.sevenths ? 4 : 3,
+      count: chordMode.extension?.toneCount.clamp(3, 4) ?? 3,
       onChanged: onInversionChanged,
     );
     final progressionSelector = _ProgressionSelector(
@@ -1603,7 +1612,7 @@ class _Controls extends StatelessWidget {
                 _ProgressionChips(
                   progression: progression!,
                   scale: chordScale,
-                  seventh: chordMode == ChordMode.sevenths,
+                  extension: chordMode.extension ?? ChordExtension.triad,
                   alignment: wide
                       ? MainAxisAlignment.end
                       : MainAxisAlignment.start,
@@ -1888,7 +1897,7 @@ class _ProgressionChips extends StatelessWidget {
   const _ProgressionChips({
     required this.progression,
     required this.scale,
-    required this.seventh,
+    required this.extension,
     required this.onSelected,
     this.alignment = MainAxisAlignment.start,
     this.wrap = false,
@@ -1897,7 +1906,7 @@ class _ProgressionChips extends StatelessWidget {
 
   final ChordProgression progression;
   final Scale scale;
-  final bool seventh;
+  final ChordExtension extension;
   final ValueChanged<int> onSelected;
 
   /// How the chips are aligned when they do not fill the row.
@@ -1928,7 +1937,7 @@ class _ProgressionChips extends StatelessWidget {
           Chord.diatonic(
             scale,
             progression.degrees[i],
-            seventh: seventh,
+            extension: extension,
           ).romanNumeral,
           // Only the colour changes, never the weight, so the active chip
           // keeps its width and the row never reflows while playing.

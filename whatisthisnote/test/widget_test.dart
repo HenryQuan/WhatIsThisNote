@@ -235,6 +235,25 @@ void main() {
     );
   });
 
+  testWidgets('extended chords update the progression chips', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ninths').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('progression-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(kProgressions.first.name).last);
+    await tester.pumpAndSettle();
+
+    // The pop progression in C major: Imaj9, V9, vi9, IVmaj9.
+    expect(find.text('Imaj9'), findsOneWidget);
+    expect(find.text('V9'), findsOneWidget);
+    expect(find.text('vi9'), findsOneWidget);
+  });
+
   testWidgets('changing inversion rotates the chord and names the bass', (
     tester,
   ) async {
@@ -672,6 +691,25 @@ void main() {
     // The button becomes a stop control; pressing it halts the sequence.
     await tester.tap(find.byKey(const Key('play-highlight')));
     await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(player.played, hasLength(1));
+  });
+
+  testWidgets('dragging the staff stops the running sequence', (tester) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+
+    await tester.tap(find.byKey(const Key('scale-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Major').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('play-highlight')));
+    await tester.pump();
+    expect(player.played, hasLength(1));
+
+    // Moving the note halts playback so the scale cannot jump octaves.
+    await tester.drag(find.byType(StaffView), const Offset(0, -60));
     await tester.pump(const Duration(seconds: 2));
     expect(player.played, hasLength(1));
   });

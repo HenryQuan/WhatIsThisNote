@@ -373,7 +373,7 @@ void main() {
     test('builds the diatonic seventh chords of a major key', () {
       final chords = [
         for (var degree = 1; degree <= 7; degree++)
-          Chord.diatonic(cMajor, degree, seventh: true),
+          Chord.diatonic(cMajor, degree, extension: ChordExtension.seventh),
       ];
       expect(chords.map((c) => c.symbol), [
         'Cmaj7',
@@ -424,6 +424,74 @@ void main() {
         11,
         13,
       ]);
+    });
+
+    test('builds the diatonic extended chords of a major key', () {
+      Chord chord(int degree, ChordExtension extension) =>
+          Chord.diatonic(cMajor, degree, extension: extension);
+
+      final c6 = chord(1, ChordExtension.sixth);
+      expect(c6.symbol, 'C6');
+      expect(c6.romanNumeral, 'I6');
+      expect(c6.pitchClasses, [0, 4, 7, 9]);
+
+      final g9 = chord(5, ChordExtension.ninth);
+      expect(g9.symbol, 'G9');
+      expect(g9.romanNumeral, 'V9');
+      expect(g9.pitchClasses, [7, 11, 2, 5, 9]);
+
+      expect(chord(1, ChordExtension.eleventh).symbol, 'Cmaj11');
+      expect(chord(1, ChordExtension.thirteenth).symbol, 'Cmaj13');
+      final g13 = chord(5, ChordExtension.thirteenth);
+      expect(g13.symbol, 'G13');
+      expect(g13.romanNumeral, 'V13');
+    });
+
+    test('names altered extensions in minor keys', () {
+      const aHarmonic = Scale('A', 9, ScaleType.harmonicMinor);
+      final v13 = Chord.diatonic(
+        aHarmonic,
+        5,
+        extension: ChordExtension.thirteenth,
+      );
+      expect(v13.symbol, 'E11\u266D9\u266D13');
+      expect(v13.romanNumeral, 'V11\u266D9\u266D13');
+      expect(v13.quality.label, 'dominant eleventh flat ninth flat thirteenth');
+
+      final iMaj7 = Chord.diatonic(
+        const Scale('A', 9, ScaleType.melodicMinor),
+        1,
+        extension: ChordExtension.seventh,
+      );
+      expect(iMaj7.symbol, 'AmMaj7');
+      expect(iMaj7.romanNumeral, 'imMaj7');
+    });
+
+    test('rotates and voices extended chords', () {
+      final six = Chord.diatonic(cMajor, 1, extension: ChordExtension.sixth);
+      expect(six.staffSteps(4), [4, 6, 8, 9]);
+      final inverted = Chord.diatonic(
+        cMajor,
+        1,
+        extension: ChordExtension.sixth,
+        inversion: 3,
+      );
+      expect(inverted.bassName, 'A');
+      expect(inverted.displaySymbol, 'C6/A');
+
+      final maj13 = Chord.diatonic(
+        cMajor,
+        1,
+        extension: ChordExtension.thirteenth,
+      );
+      expect(maj13.staffSteps(4), [4, 6, 8, 10, 12, 14, 16]);
+      final maj13Inv = Chord.diatonic(
+        cMajor,
+        1,
+        extension: ChordExtension.thirteenth,
+        inversion: 1,
+      );
+      expect(maj13Inv.staffSteps(4), [6, 8, 10, 12, 14, 16, 18]);
     });
 
     test('uses flat numerals in minor keys', () {
