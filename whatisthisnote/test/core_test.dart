@@ -467,6 +467,16 @@ void main() {
       expect(iMaj7.romanNumeral, 'imMaj7');
     });
 
+    test('names a specific chord picked from the readout', () {
+      final quality = kChordQualities.firstWhere(
+        (q) => q.suffix == 'maj13\u266F11',
+      );
+      final chord = Chord.onNote(Note.fromLetter(NoteLetter.f, 4), quality);
+      expect(chord.symbol, 'Fmaj13\u266F11');
+      expect(chord.diatonic, isFalse);
+      expect(chord.pitchClasses, [5, 9, 0, 4, 7, 11, 2]);
+    });
+
     test('rotates and voices extended chords', () {
       final six = Chord.diatonic(cMajor, 1, extension: ChordExtension.sixth);
       expect(six.staffSteps(4), [4, 6, 8, 9]);

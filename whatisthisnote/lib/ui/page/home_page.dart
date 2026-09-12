@@ -70,6 +70,9 @@ class _HomePageState extends State<HomePage> {
   int _inversion = 0;
   ChordProgression? _progression;
 
+  /// A specific chord picked from the readout, overriding the diatonic chord.
+  ChordQuality? _chordQuality;
+
   /// Optional guided theory path (an add-on), off by default.
   bool _guided = false;
   int _lessonIndex = 0;
@@ -286,21 +289,35 @@ class _HomePageState extends State<HomePage> {
   /// The diatonic chord built on [note]'s scale degree, or `null` when the
   /// chord lab is off or [note] is not in [scale].
   Chord? _chordFor(Scale scale, Note note) {
-    final extension = _chordMode.extension;
-    if (extension == null) return null;
+    if (_chordMode == ChordMode.off) return null;
+    final override = _chordQuality;
+    if (override != null) {
+      return Chord.onNote(note, override, inversion: _inversion);
+    }
     if (!scale.pitchClasses.contains(note.midi % 12)) return null;
     return Chord.diatonic(
       scale,
       _degreeOf(note, scale),
-      extension: extension,
+      extension: _chordMode.extension!,
       inversion: _inversion,
     );
+  }
+
+  /// Selects a specific chord for the current root, or clears the override when
+  /// the diatonic chord is wanted again.
+  void _selectChordQuality(ChordQuality quality) {
+    _stopSequence();
+    setState(() {
+      _chordQuality = quality;
+      _inversion = 0;
+    });
   }
 
   void _setChordMode(ChordMode mode) {
     if (_playback != null) _stopSequence();
     setState(() {
       _chordMode = mode;
+      _chordQuality = null;
       final tones = mode.extension?.toneCount ?? 0;
       final max = tones == 0 ? 0 : (tones - 1).clamp(0, 3);
       if (_inversion > max) _inversion = 0;
@@ -638,6 +655,7 @@ class _HomePageState extends State<HomePage> {
                       chordScale: chordScale,
                       chordMode: _chordMode,
                       inversion: chord?.inversion ?? 0,
+                      selectedQuality: _chordQuality,
                       progression: _progression,
                       step: _step,
                       playingPitchClass: playingPitchClass,
@@ -665,6 +683,7 @@ class _HomePageState extends State<HomePage> {
                         setState(() => _scaleType = type);
                       },
                       onChordModeChanged: _setChordMode,
+                      onQualitySelected: _selectChordQuality,
                       onInversionChanged: (value) {
                         _stopSequence();
                         setState(() => _inversion = value);
@@ -1223,6 +1242,7 @@ class _Controls extends StatelessWidget {
     required this.chordScale,
     required this.chordMode,
     required this.inversion,
+    required this.selectedQuality,
     required this.progression,
     required this.step,
     required this.playingPitchClass,
@@ -1237,6 +1257,7 @@ class _Controls extends StatelessWidget {
     required this.onKeyChanged,
     required this.onScaleTypeChanged,
     required this.onChordModeChanged,
+    required this.onQualitySelected,
     required this.onInversionChanged,
     required this.onProgressionChanged,
     required this.onDegreeSelected,
@@ -1255,6 +1276,7 @@ class _Controls extends StatelessWidget {
   final Scale chordScale;
   final ChordMode chordMode;
   final int inversion;
+  final ChordQuality? selectedQuality;
   final ChordProgression? progression;
   final int step;
   final int? playingPitchClass;
@@ -1269,6 +1291,7 @@ class _Controls extends StatelessWidget {
   final ValueChanged<MusicalKey> onKeyChanged;
   final ValueChanged<ScaleType?> onScaleTypeChanged;
   final ValueChanged<ChordMode> onChordModeChanged;
+  final ValueChanged<ChordQuality> onQualitySelected;
   final ValueChanged<int> onInversionChanged;
   final ValueChanged<ChordProgression?> onProgressionChanged;
   final ValueChanged<int> onDegreeSelected;
@@ -1331,9 +1354,11 @@ class _Controls extends StatelessWidget {
       value: chordMode,
       onChanged: onChordModeChanged,
     );
+    final chordTones =
+        selectedQuality?.toneCount ?? chordMode.extension?.toneCount ?? 3;
     final inversionSelector = _InversionSelector(
       value: inversion,
-      count: chordMode.extension?.toneCount.clamp(3, 4) ?? 3,
+      count: chordTones.clamp(3, 4),
       onChanged: onInversionChanged,
     );
     final progressionSelector = _ProgressionSelector(
@@ -1551,7 +1576,13 @@ class _Controls extends StatelessWidget {
               ),
               if (chordMode != ChordMode.off) ...[
                 const SizedBox(height: 12),
-                _ChordReadout(chord: chord, chordScale: chordScale),
+                _ChordReadout(
+                  chord: chord,
+                  chordScale: chordScale,
+                  rootName: chord?.rootName ?? note.pitchName,
+                  selectedQuality: selectedQuality,
+                  onQualitySelected: onQualitySelected,
+                ),
               ],
               if (!wide) ...[
                 const SizedBox(height: 12),
@@ -2014,10 +2045,24 @@ class _ProgressionChips extends StatelessWidget {
 }
 
 class _ChordReadout extends StatelessWidget {
-  const _ChordReadout({required this.chord, required this.chordScale});
+  const _ChordReadout({
+    required this.chord,
+    required this.chordScale,
+    required this.rootName,
+    required this.selectedQuality,
+    required this.onQualitySelected,
+  });
 
   final Chord? chord;
   final Scale chordScale;
+
+  /// The root the quality menu is built on.
+  final String rootName;
+
+  /// The specific chord currently picked, or `null` for the diatonic chord.
+  final ChordQuality? selectedQuality;
+
+  final ValueChanged<ChordQuality> onQualitySelected;
 
   @override
   Widget build(BuildContext context) {
@@ -2026,22 +2071,38 @@ class _ChordReadout extends StatelessWidget {
     final chord = this.chord;
     final caption = chord == null
         ? 'chromatic note \u2013 no diatonic chord'
-        : '${chord.romanNumeral}  ·  ${chord.quality.label}  ·  '
-              '${chord.inversionLabel} in ${chordScale.label}';
+        : chord.diatonic
+        ? '${chord.romanNumeral}  ·  ${chord.quality.label}  ·  '
+              '${chord.inversionLabel} in ${chordScale.label}'
+        : '${chord.quality.label}  ·  ${chord.inversionLabel}  ·  '
+              'chosen chord';
     return Row(
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-          decoration: BoxDecoration(
-            color: scheme.tertiaryContainer,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            chord?.displaySymbol ?? '\u2013',
-            key: const Key('chord-symbol'),
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: scheme.onTertiaryContainer,
-              fontWeight: FontWeight.bold,
+        PopupMenuButton<ChordQuality>(
+          key: const Key('chord-menu'),
+          tooltip: 'Choose a chord',
+          onSelected: onQualitySelected,
+          itemBuilder: (context) => [
+            for (final quality in kChordQualities)
+              CheckedPopupMenuItem<ChordQuality>(
+                value: quality,
+                checked: quality == selectedQuality,
+                child: Text('$rootName${quality.suffix}'),
+              ),
+          ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: scheme.tertiaryContainer,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              chord?.displaySymbol ?? '\u2013',
+              key: const Key('chord-symbol'),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: scheme.onTertiaryContainer,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),

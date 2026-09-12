@@ -51,7 +51,13 @@ enum ChordMode {
 /// Extended chords keep intervals above an octave: a ninth is 14 semitones, an
 /// eleventh 17 and a thirteenth 21.
 class ChordQuality {
-  const ChordQuality(this.label, this.suffix, this.romanSuffix, this.intervals);
+  const ChordQuality(
+    this.label,
+    this.suffix,
+    this.romanSuffix,
+    this.intervals,
+    this.scaleSteps,
+  );
 
   final String label;
   final String suffix;
@@ -60,55 +66,80 @@ class ChordQuality {
   /// Semitone offsets above the root, low to high.
   final List<int> intervals;
 
+  /// Diatonic steps of each tone above the root, low to high.
+  final List<int> scaleSteps;
+
   bool get isSeventh => intervals.length == 4;
 
   /// Whether the third is minor, so the roman numeral is lower case.
   bool get hasMinorThird => intervals[1] == 3;
 
-  static const major = ChordQuality('major', '', '', [0, 4, 7]);
-  static const minor = ChordQuality('minor', 'm', '', [0, 3, 7]);
-  static const diminished = ChordQuality('diminished', 'dim', '\u00B0', [
-    0,
-    3,
-    6,
-  ]);
-  static const augmented = ChordQuality('augmented', 'aug', '+', [0, 4, 8]);
-  static const majorSixth = ChordQuality('major sixth', '6', '6', [0, 4, 7, 9]);
-  static const minorSixth = ChordQuality('minor sixth', 'm6', '6', [
-    0,
-    3,
-    7,
-    9,
-  ]);
-  static const majorSeventh = ChordQuality('major seventh', 'maj7', 'maj7', [
-    0,
-    4,
-    7,
-    11,
-  ]);
-  static const dominantSeventh = ChordQuality('dominant seventh', '7', '7', [
-    0,
-    4,
-    7,
-    10,
-  ]);
-  static const minorSeventh = ChordQuality('minor seventh', 'm7', '7', [
-    0,
-    3,
-    7,
-    10,
-  ]);
+  int get toneCount => intervals.length;
+
+  static const major = ChordQuality('major', '', '', [0, 4, 7], [0, 2, 4]);
+  static const minor = ChordQuality('minor', 'm', '', [0, 3, 7], [0, 2, 4]);
+  static const diminished = ChordQuality(
+    'diminished',
+    'dim',
+    '\u00B0',
+    [0, 3, 6],
+    [0, 2, 4],
+  );
+  static const augmented = ChordQuality(
+    'augmented',
+    'aug',
+    '+',
+    [0, 4, 8],
+    [0, 2, 4],
+  );
+  static const majorSixth = ChordQuality(
+    'major sixth',
+    '6',
+    '6',
+    [0, 4, 7, 9],
+    [0, 2, 4, 5],
+  );
+  static const minorSixth = ChordQuality(
+    'minor sixth',
+    'm6',
+    '6',
+    [0, 3, 7, 9],
+    [0, 2, 4, 5],
+  );
+  static const majorSeventh = ChordQuality(
+    'major seventh',
+    'maj7',
+    'maj7',
+    [0, 4, 7, 11],
+    [0, 2, 4, 6],
+  );
+  static const dominantSeventh = ChordQuality(
+    'dominant seventh',
+    '7',
+    '7',
+    [0, 4, 7, 10],
+    [0, 2, 4, 6],
+  );
+  static const minorSeventh = ChordQuality(
+    'minor seventh',
+    'm7',
+    '7',
+    [0, 3, 7, 10],
+    [0, 2, 4, 6],
+  );
   static const halfDiminishedSeventh = ChordQuality(
     'half-diminished seventh',
     'm7\u266D5',
     '\u00F87',
     [0, 3, 6, 10],
+    [0, 2, 4, 6],
   );
   static const diminishedSeventh = ChordQuality(
     'diminished seventh',
     'dim7',
     '\u00B07',
     [0, 3, 6, 9],
+    [0, 2, 4, 6],
   );
 
   /// Names the chord built from a diatonic stack of [scaleSteps] with the
@@ -133,10 +164,22 @@ class ChordQuality {
         final six = sixth == 9 ? '6' : '\u266D6';
         final sixWord = sixth == 9 ? 'sixth' : 'flat sixth';
         if (third == 4 && fifth == 7) {
-          return ChordQuality('major $sixWord', six, six, intervals);
+          return ChordQuality(
+            'major $sixWord',
+            six,
+            six,
+            intervals,
+            scaleSteps,
+          );
         }
         if (third == 3 && fifth == 7) {
-          return ChordQuality('minor $sixWord', 'm$six', six, intervals);
+          return ChordQuality(
+            'minor $sixWord',
+            'm$six',
+            six,
+            intervals,
+            scaleSteps,
+          );
         }
         if (third == 4 && fifth == 8) {
           return ChordQuality(
@@ -144,6 +187,7 @@ class ChordQuality {
             'aug$six',
             '+$six',
             intervals,
+            scaleSteps,
           );
         }
         return ChordQuality(
@@ -151,6 +195,7 @@ class ChordQuality {
           'dim$six',
           '\u00B0$six',
           intervals,
+          scaleSteps,
         );
       }
       if (third == 4 && fifth == 7) return ChordQuality.major;
@@ -296,7 +341,7 @@ class ChordQuality {
       roman += alterations.join();
       label += ' ${alterationWords.join(' ')}';
     }
-    return ChordQuality(label, suffix, roman, intervals);
+    return ChordQuality(label, suffix, roman, intervals, scaleSteps);
   }
 
   @override
@@ -316,6 +361,45 @@ class ChordQuality {
   int get hashCode => Object.hash(suffix, Object.hashAll(intervals));
 }
 
+/// Chord qualities offered when a specific chord is picked from the readout.
+///
+/// Covers the common triads, sixths, and stacked sevenths through thirteenths,
+/// including altered shapes that only occur in some keys (for example
+/// `maj13\u266F11`), so any of them can be selected by name on the current root.
+final List<ChordQuality> kChordQualities = [
+  for (final (steps, intervals) in const <(List<int>, List<int>)>[
+    ([0, 2, 4], [0, 4, 7]),
+    ([0, 2, 4], [0, 3, 7]),
+    ([0, 2, 4], [0, 3, 6]),
+    ([0, 2, 4], [0, 4, 8]),
+    ([0, 2, 4, 5], [0, 4, 7, 9]),
+    ([0, 2, 4, 5], [0, 3, 7, 9]),
+    ([0, 2, 4, 6], [0, 4, 7, 11]),
+    ([0, 2, 4, 6], [0, 4, 7, 10]),
+    ([0, 2, 4, 6], [0, 3, 7, 10]),
+    ([0, 2, 4, 6], [0, 3, 6, 10]),
+    ([0, 2, 4, 6], [0, 3, 6, 9]),
+    ([0, 2, 4, 6], [0, 3, 7, 11]),
+    ([0, 2, 4, 6], [0, 4, 8, 11]),
+    ([0, 2, 4, 6, 8], [0, 4, 7, 11, 14]),
+    ([0, 2, 4, 6, 8], [0, 4, 7, 10, 14]),
+    ([0, 2, 4, 6, 8], [0, 3, 7, 10, 14]),
+    ([0, 2, 4, 6, 8], [0, 4, 7, 10, 13]),
+    ([0, 2, 4, 6, 8], [0, 4, 7, 10, 15]),
+    ([0, 2, 4, 6, 8, 10], [0, 4, 7, 11, 14, 17]),
+    ([0, 2, 4, 6, 8, 10], [0, 4, 7, 10, 14, 17]),
+    ([0, 2, 4, 6, 8, 10], [0, 3, 7, 10, 14, 17]),
+    ([0, 2, 4, 6, 8, 10], [0, 4, 7, 10, 14, 18]),
+    ([0, 2, 4, 6, 8, 10, 12], [0, 4, 7, 11, 14, 17, 21]),
+    ([0, 2, 4, 6, 8, 10, 12], [0, 4, 7, 10, 14, 17, 21]),
+    ([0, 2, 4, 6, 8, 10, 12], [0, 3, 7, 10, 14, 17, 21]),
+    ([0, 2, 4, 6, 8, 10, 12], [0, 4, 7, 11, 14, 18, 21]),
+    ([0, 2, 4, 6, 8, 10, 12], [0, 4, 7, 10, 14, 18, 21]),
+    ([0, 2, 4, 6, 8, 10, 12], [0, 4, 7, 10, 14, 17, 20]),
+  ])
+    ChordQuality.fromStack(steps, intervals),
+];
+
 /// A chord: a root plus a [ChordQuality]. [inversion] rotates the chord tones
 /// so that another chord tone becomes the bass.
 class Chord {
@@ -325,10 +409,25 @@ class Chord {
     required this.rootLetter,
     required this.quality,
     required this.degree,
-    required this.scaleSteps,
     this.flatDegree = false,
+    this.diatonic = true,
     this.inversion = 0,
   });
+
+  /// Builds [root]'s chord with an explicit [quality], used when a specific
+  /// chord (for example Fmaj13\u266F11) is picked from the readout instead of the
+  /// scale's diatonic chord.
+  factory Chord.onNote(Note root, ChordQuality quality, {int inversion = 0}) {
+    return Chord(
+      rootName: root.pitchName,
+      rootPitchClass: root.midi % 12,
+      rootLetter: root.letter,
+      quality: quality,
+      degree: 1,
+      diatonic: false,
+      inversion: inversion.clamp(0, quality.intervals.length - 1),
+    );
+  }
 
   /// Builds the diatonic chord on [degree] (1..7) of a seven-note [scale],
   /// stacking [extension] above the root.
@@ -360,7 +459,6 @@ class Chord {
       rootLetter: rootLetter,
       quality: quality,
       degree: degree,
-      scaleSteps: scaleSteps,
       flatDegree: degrees[d].label.startsWith('\u266D'),
       inversion: inversion.clamp(0, quality.intervals.length - 1),
     );
@@ -374,8 +472,9 @@ class Chord {
   /// Scale degree of the root, 1..7.
   final int degree;
 
-  /// Diatonic steps of each chord tone above the root, low to high.
-  final List<int> scaleSteps;
+  /// Whether the chord is the scale's diatonic chord, rather than a specific
+  /// chord picked from the readout.
+  final bool diatonic;
 
   /// Whether the scale degree's label carries a flat (used by [romanNumeral]).
   final bool flatDegree;
@@ -383,6 +482,9 @@ class Chord {
   final int inversion;
 
   List<int> get intervals => quality.intervals;
+
+  /// Diatonic steps of each chord tone above the root, low to high.
+  List<int> get scaleSteps => quality.scaleSteps;
 
   /// Chord symbol, e.g. `C`, `Dm`, `G7` or `Bdim`.
   String get symbol => '$rootName${quality.suffix}';

@@ -254,6 +254,40 @@ void main() {
     expect(find.text('vi9'), findsOneWidget);
   });
 
+  testWidgets('tapping the chord symbol picks a specific chord', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Triads').last);
+    await tester.pumpAndSettle();
+    // B4 is degree vii of C major, so the diatonic triad is B diminished.
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chord-symbol'))).data,
+      'Bdim',
+    );
+
+    await tester.tap(find.byKey(const Key('chord-symbol')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(CheckedPopupMenuItem<ChordQuality>, 'Bmaj7').last,
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chord-symbol'))).data,
+      'Bmaj7',
+    );
+    expect(
+      tester
+          .widget<PianoKeyboard>(find.byType(PianoKeyboard))
+          .chordPitchClasses,
+      {11, 3, 6, 10},
+    );
+  });
+
   testWidgets('changing inversion rotates the chord and names the bass', (
     tester,
   ) async {
