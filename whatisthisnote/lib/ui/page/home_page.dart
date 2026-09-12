@@ -199,6 +199,9 @@ class _HomePageState extends State<HomePage> {
       _chordMode = mode;
       final max = mode == ChordMode.sevenths ? 3 : 2;
       if (_inversion > max) _inversion = 0;
+      // Progression chips belong to the chord lab; clear the selection when
+      // the lab is turned off so nothing stale renders in the rail.
+      if (mode == ChordMode.off) _progression = null;
     });
   }
 
@@ -995,6 +998,28 @@ class _PracticePanel extends StatelessWidget {
   }
 }
 
+/// Reserves the width of one accidental glyph in the note readout so that a
+/// sharp or flat appearing mid-drag never reflows the panel. The glyph itself
+/// is fully transparent and hidden from assistive tech.
+class _AccidentalReserve extends StatelessWidget {
+  const _AccidentalReserve({super.key, required this.style});
+
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Text(
+        '\u266F',
+        maxLines: 1,
+        style: (style ?? const TextStyle()).copyWith(
+          color: const Color(0x00000000),
+        ),
+      ),
+    );
+  }
+}
+
 class _Controls extends StatelessWidget {
   const _Controls({
     super.key,
@@ -1140,6 +1165,7 @@ class _Controls extends StatelessWidget {
                                 child: Text(
                                   primaryName,
                                   key: const Key('note-name'),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.displaySmall?.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -1148,6 +1174,16 @@ class _Controls extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            // Reserve room for an accidental even on natural
+                            // notes so a sharp/flat appearing mid-drag does not
+                            // widen the readout and shift the layout.
+                            if (note.isNatural)
+                              _AccidentalReserve(
+                                key: const Key('note-name-reserve'),
+                                style: theme.textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             if (enharmonic != null) ...[
                               const SizedBox(width: 8),
                               Flexible(
@@ -1188,11 +1224,15 @@ class _Controls extends StatelessWidget {
                                         ),
                                   ),
                                 ),
+                                if (note.isNatural)
+                                  _AccidentalReserve(
+                                    style: theme.textTheme.headlineSmall,
+                                  ),
                               ],
                             ],
                           ),
                         Text(
-                          '${clef.label} clef  ·  drag the note or tap the staff',
+                          '${clef.label} clef',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -1331,7 +1371,7 @@ class _Controls extends StatelessWidget {
                   progressionSelector,
                 ],
               ],
-              if (progression != null) ...[
+              if (chordMode != ChordMode.off && progression != null) ...[
                 const SizedBox(height: 8),
                 _ProgressionChips(
                   progression: progression!,
@@ -1639,10 +1679,13 @@ class _ProgressionChips extends StatelessWidget {
   /// off at the edge.
   final bool wrap;
 
-  List<Widget> _buildChips() => [
+  List<Widget> _buildChips(
+    ChordProgression progression, {
+    required bool keyed,
+  }) => [
     for (var i = 0; i < progression.degrees.length; i++)
       ActionChip(
-        key: Key('prog-$i'),
+        key: keyed ? Key('prog-$i') : null,
         visualDensity: VisualDensity.compact,
         label: Text(
           Chord.diatonic(
@@ -1655,18 +1698,43 @@ class _ProgressionChips extends StatelessWidget {
       ),
   ];
 
+  Wrap _wrapChips(List<Widget> chips) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    alignment: alignment == MainAxisAlignment.end
+        ? WrapAlignment.end
+        : WrapAlignment.start,
+    children: chips,
+  );
+
   @override
   Widget build(BuildContext context) {
-    final chips = _buildChips();
+    final chips = _buildChips(progression, keyed: true);
     if (wrap) {
-      return Wrap(
-        key: const Key('progression-chips'),
-        spacing: 8,
-        runSpacing: 8,
-        alignment: alignment == MainAxisAlignment.end
-            ? WrapAlignment.end
-            : WrapAlignment.start,
-        children: chips,
+      // Reserve the height needed by the longest built-in progression so the
+      // rail does not resize (and the panel does not jump) when switching
+      // between progressions with different numbers of chips.
+      final longest = kProgressions.reduce(
+        (a, b) => a.degrees.length >= b.degrees.length ? a : b,
+      );
+      return Stack(
+        children: [
+          if (longest != progression)
+            ExcludeFocus(
+              child: IgnorePointer(
+                child: ExcludeSemantics(
+                  child: Opacity(
+                    opacity: 0,
+                    child: _wrapChips(_buildChips(longest, keyed: false)),
+                  ),
+                ),
+              ),
+            ),
+          KeyedSubtree(
+            key: const Key('progression-chips'),
+            child: _wrapChips(chips),
+          ),
+        ],
       );
     }
     return LayoutBuilder(

@@ -226,25 +226,27 @@ class _StaffViewState extends State<StaffView>
         _noteX = _clampNoteX(geometry, _noteX);
 
         final scheme = Theme.of(context).colorScheme;
-        final staff = CustomPaint(
-          size: Size.infinite,
-          painter: NotationPainter(
-            geometry: geometry,
-            clef: widget.clef,
-            key: widget.keySignature,
-            step: _currentStep,
-            noteX: _noteX,
-            lineColor: scheme.onSurface.withValues(alpha: 0.85),
-            noteColor: scheme.primary,
-            labelColor: scheme.primary,
-            labelBackgroundColor: scheme.surface,
-            showLabel: widget.showLabel,
-            naming: widget.naming,
-            showEnharmonic: widget.showEnharmonic,
-            chordSteps: widget.chordSteps,
-            chordColor: scheme.tertiary,
-            targetStep: widget.targetStep,
-            targetColor: scheme.outline,
+        final staff = RepaintBoundary(
+          child: CustomPaint(
+            size: Size.infinite,
+            painter: NotationPainter(
+              geometry: geometry,
+              clef: widget.clef,
+              key: widget.keySignature,
+              step: _currentStep,
+              noteX: _noteX,
+              lineColor: scheme.onSurface.withValues(alpha: 0.85),
+              noteColor: scheme.primary,
+              labelColor: scheme.primary,
+              labelBackgroundColor: scheme.surface,
+              showLabel: widget.showLabel,
+              naming: widget.naming,
+              showEnharmonic: widget.showEnharmonic,
+              chordSteps: widget.chordSteps,
+              chordColor: scheme.tertiary,
+              targetStep: widget.targetStep,
+              targetColor: scheme.outline,
+            ),
           ),
         );
         if (!widget.interactive) {

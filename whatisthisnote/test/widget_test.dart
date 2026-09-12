@@ -354,6 +354,78 @@ void main() {
     expect(canonHeight, popHeight);
   });
 
+  testWidgets('turning chords off clears the progression', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Triads').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('progression-label')));
+    await tester.tap(find.byKey(const Key('progression-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pop \u2013 I V vi IV').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('progression-chips')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Off').last);
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('progression-chips')), findsNothing);
+    expect(find.byKey(const Key('progression-label')), findsNothing);
+
+    // Re-enabling the lab does not resurrect the cleared progression.
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Triads').last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('progression-chips')), findsNothing);
+  });
+
+  testWidgets('switching progressions does not jump the controls rail', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1024, 768));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sevenths').last);
+    await tester.pumpAndSettle();
+
+    Future<void> choose(String name) async {
+      await tester.tap(find.byKey(const Key('progression-label')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(name).last);
+      await tester.pumpAndSettle();
+    }
+
+    void scrollToBottom() {
+      final scrollable = find.descendant(
+        of: find.byKey(const Key('controls')),
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(scrollable.first).position;
+      position.jumpTo(position.maxScrollExtent);
+    }
+
+    await choose('Canon \u2013 I V vi iii IV I IV V');
+    scrollToBottom();
+    await tester.pumpAndSettle();
+    final before = tester.getTopLeft(find.byKey(const Key('scale-label'))).dy;
+
+    await choose('Pop \u2013 I V vi IV');
+    final after = tester.getTopLeft(find.byKey(const Key('scale-label'))).dy;
+
+    // The chip area reserves the tallest progression, so no scroll clamp
+    // shoves the controls above it when a shorter progression is selected.
+    expect(after, before);
+  });
+
   testWidgets('the staff size does not jump when controls change', (
     tester,
   ) async {
@@ -504,10 +576,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'Si');
-    expect(
-      tester.widget<Text>(find.byKey(const Key('note-pitch'))).data,
-      'B4',
-    );
+    expect(tester.widget<Text>(find.byKey(const Key('note-pitch'))).data, 'B4');
     final painter = tester
         .widgetList<CustomPaint>(find.byType(CustomPaint))
         .map((custom) => custom.painter)
@@ -554,6 +623,33 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('note-enharmonic'))).data,
       '\u2248 G\u266D5',
     );
+  });
+
+  testWidgets('the readout reserves room for a sharp or flat', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    // F5 in C major: natural, but the readout reserves an accidental glyph.
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byTooltip('Higher'));
+      await tester.pumpAndSettle();
+    }
+    expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'F5');
+    final natural = _readoutRight(tester);
+    expect(find.byKey(const Key('note-name-reserve')), findsOneWidget);
+
+    // The same staff position in G major is F♯5, one glyph wider.
+    await tester.tap(find.byKey(const Key('key-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('G major').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      'F\u266F5',
+    );
+    final accidental = _readoutRight(tester);
+
+    // The reserved glyph exactly offsets the accidental, so nothing shifts.
+    expect(accidental, closeTo(natural, 0.5));
   });
 
   testWidgets('the first-run coach mark shows once and can be dismissed', (
@@ -784,6 +880,17 @@ void main() {
       reason: 'the compact controls should not need to scroll',
     );
   });
+}
+
+/// Right edge of the primary note-name slot, including the transparent
+/// accidental reserve when the note is natural.
+double _readoutRight(WidgetTester tester) {
+  var right = tester.getRect(find.byKey(const Key('note-name'))).right;
+  final reserve = find.byKey(const Key('note-name-reserve'));
+  if (reserve.evaluate().isNotEmpty) {
+    right = tester.getRect(reserve).right;
+  }
+  return right;
 }
 
 double _paintedStep(WidgetTester tester) {
