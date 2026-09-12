@@ -40,6 +40,9 @@ without opening an image viewer.
 | `whatisthisnote/android/.../drawable/ic_launcher_monochrome.xml` | Android themed icon (Material You) |
 | `whatisthisnote/android/.../mipmap-anydpi-v26/ic_launcher*.xml` | Android adaptive icon |
 | `whatisthisnote/web/favicon.png`, `web/icons/*.png` | web / PWA |
+| `whatisthisnote/windows/runner/resources/app_icon.ico` | Windows |
+| `whatisthisnote/macos/.../AppIcon.appiconset/app_icon_*.png` | macOS |
+| `whatisthisnote/linux/runner/resources/app_icon.png` | Linux window icon |
 
 ## Android theming
 

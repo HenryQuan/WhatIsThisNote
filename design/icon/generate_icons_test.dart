@@ -23,6 +23,9 @@
 //   whatisthisnote/android/app/src/main/res/values/ic_launcher_background.xml
 //   whatisthisnote/web/favicon.png
 //   whatisthisnote/web/icons/*.png
+//   whatisthisnote/windows/runner/resources/app_icon.ico
+//   whatisthisnote/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_*.png
+//   whatisthisnote/linux/runner/resources/app_icon.png
 library;
 
 import 'dart:io';
@@ -75,6 +78,9 @@ void main() {
     await _writeIos(appDir);
     await _writeAndroid(appDir);
     await _writeWeb(appDir);
+    await _writeWindows(appDir);
+    await _writeMacos(appDir);
+    await _writeLinux(appDir);
 
     await _writePng(
       '${designDir.path}${Platform.pathSeparator}preview.png',
@@ -315,6 +321,93 @@ Future<void> _writeWeb(Directory appDir) async {
       scale: _safeScale, radius: 0);
   await _writePng('$icons${Platform.pathSeparator}Icon-maskable-512.png', 512,
       scale: _safeScale, radius: 0);
+}
+
+Future<void> _writeWindows(Directory appDir) async {
+  const sizes = [16, 32, 48, 64, 128, 256];
+  final pngs = <int, List<int>>{};
+  for (final size in sizes) {
+    final image = await _render(
+      size,
+      scale: _plainScale,
+      radius: 0.223,
+    );
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    pngs[size] = data!.buffer.asUint8List();
+  }
+
+  final bytes = <int>[
+    ..._u16(0), // reserved
+    ..._u16(1), // type: icon
+    ..._u16(pngs.length),
+  ];
+  var offset = 6 + pngs.length * 16;
+  final imageData = <int>[];
+  for (final entry in pngs.entries) {
+    final size = entry.key;
+    bytes.addAll([
+      size >= 256 ? 0 : size, // width
+      size >= 256 ? 0 : size, // height
+      0, // color count
+      0, // reserved
+      ..._u16(1), // color planes
+      ..._u16(32), // bits per pixel
+      ..._u32(entry.value.length),
+      ..._u32(offset),
+    ]);
+    imageData.addAll(entry.value);
+    offset += entry.value.length;
+  }
+  bytes.addAll(imageData);
+
+  final file = File('${appDir.path}${Platform.pathSeparator}windows'
+      '${Platform.pathSeparator}runner${Platform.pathSeparator}resources'
+      '${Platform.pathSeparator}app_icon.ico');
+  file.parent.createSync(recursive: true);
+  file.writeAsBytesSync(bytes);
+}
+
+List<int> _u16(int value) => [value & 0xFF, (value >> 8) & 0xFF];
+
+List<int> _u32(int value) => [
+      value & 0xFF,
+      (value >> 8) & 0xFF,
+      (value >> 16) & 0xFF,
+      (value >> 24) & 0xFF,
+    ];
+
+Future<void> _writeMacos(Directory appDir) async {
+  final dir = '${appDir.path}${Platform.pathSeparator}macos'
+      '${Platform.pathSeparator}Runner${Platform.pathSeparator}Assets.xcassets'
+      '${Platform.pathSeparator}AppIcon.appiconset';
+  const icons = {
+    'app_icon_16.png': 16,
+    'app_icon_32.png': 32,
+    'app_icon_64.png': 64,
+    'app_icon_128.png': 128,
+    'app_icon_256.png': 256,
+    'app_icon_512.png': 512,
+    'app_icon_1024.png': 1024,
+  };
+  for (final entry in icons.entries) {
+    await _writePng(
+      '${dir}${Platform.pathSeparator}${entry.key}',
+      entry.value,
+      scale: _plainScale,
+      radius: 0.223,
+    );
+  }
+}
+
+Future<void> _writeLinux(Directory appDir) async {
+  final dir = '${appDir.path}${Platform.pathSeparator}linux'
+      '${Platform.pathSeparator}runner${Platform.pathSeparator}resources';
+  await _writePng(
+    '${dir}${Platform.pathSeparator}app_icon.png',
+    256,
+    scale: _plainScale,
+    radius: 0.223,
+  );
 }
 
 Future<void> _writeVectors(Directory dir) async {
