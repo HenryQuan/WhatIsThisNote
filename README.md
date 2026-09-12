@@ -26,8 +26,16 @@ lines.
 - [x] Scale highlight: major, natural/harmonic/melodic minor, major/minor
       pentatonic and blues, tinted on the piano keyboard with the note's scale
       degree
-- [ ] Chords and harmony lab (triads, inversions, Roman numerals, progressions)
+- [x] Chords and harmony lab: diatonic triads and seventh chords shown on the
+      staff and piano with their chord symbol and Roman numeral, root/1st/2nd/
+      3rd inversion with slash-bass names, and tappable progressions
+      (I-V-vi-IV, ii-V-I, canon, Andalusian)
 - [ ] Guided theory path (step-by-step lessons)
+
+The chord lab works from the note's scale degree and only builds chords on
+seven-note scales; it falls back to the key's major or natural minor scale and
+shows no chord for chromatic notes. Progressions are selected and tapped
+rather than played (there is no audio engine).
 
 ### Pro features
 

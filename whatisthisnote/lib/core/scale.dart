@@ -1,3 +1,6 @@
+import 'accidental.dart';
+import 'note.dart';
+
 /// One step of a scale: a semitone offset above the tonic plus the degree
 /// label used in music theory, e.g. `3` or `♭7`.
 class ScaleDegree {
@@ -78,9 +81,11 @@ enum ScaleType {
 
   /// True when the scale contains a note that is a blue note (♭3, ♭5 or ♭7)
   /// rather than a plain major-scale degree.
-  bool get hasBlueNotes =>
-      degrees.any((d) => d.label.startsWith('\u266D') &&
-          const {'\u266D3', '\u266D5', '\u266D7'}.contains(d.label));
+  bool get hasBlueNotes => degrees.any(
+    (d) =>
+        d.label.startsWith('\u266D') &&
+        const {'\u266D3', '\u266D5', '\u266D7'}.contains(d.label),
+  );
 }
 
 /// A [ScaleType] rooted at a particular pitch class.
@@ -98,11 +103,25 @@ class Scale {
   /// Human readable name, e.g. `G Blues`.
   String get label => '$tonicLabel ${type.label}';
 
+  /// The tonic letter, parsed from [tonicLabel].
+  NoteLetter get tonicLetter =>
+      NoteLetter.values.firstWhere((letter) => letter.name == tonicLabel[0]);
+
+  /// The accidental of the tonic, parsed from [tonicLabel].
+  Accidental get tonicAccidental {
+    if (tonicLabel.contains('\u266F')) return Accidental.sharp;
+    if (tonicLabel.contains('\u266D')) return Accidental.flat;
+    return Accidental.natural;
+  }
+
+  /// True when the scale has one note per letter (major, minor), the
+  /// requirement for building diatonic chords.
+  bool get isHeptatonic => type.degrees.length == 7;
+
   /// The twelve-tone pitch classes that belong to this scale.
   Set<int> get pitchClasses => {
-        for (final degree in type.degrees)
-          (tonicPitchClass + degree.semitone) % 12,
-      };
+    for (final degree in type.degrees) (tonicPitchClass + degree.semitone) % 12,
+  };
 
   /// Whether the sounding [midi] note is in the scale.
   bool contains(int midi) => pitchClasses.contains(midi % 12);

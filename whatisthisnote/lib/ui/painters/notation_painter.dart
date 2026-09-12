@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/clef.dart';
@@ -20,6 +21,8 @@ class NotationPainter extends CustomPainter {
     required this.labelColor,
     required this.labelBackgroundColor,
     required this.showLabel,
+    this.chordSteps = const [],
+    this.chordColor = const Color(0xFF000000),
   });
 
   final StaffGeometry geometry;
@@ -39,6 +42,19 @@ class NotationPainter extends CustomPainter {
   final Color labelBackgroundColor;
   final bool showLabel;
 
+  /// Staff steps of the current chord, low to high. Empty for a single note.
+  final List<int> chordSteps;
+
+  /// Colour used for the chord tones other than the root.
+  final Color chordColor;
+
+  /// Staff step the label describes: the lowest chord tone (the bass) when a
+  /// chord is shown, otherwise the written note.
+  int get labelStep => chordSteps.isEmpty ? step.round() : chordSteps.first;
+
+  /// Name shown by the label next to the note (or the chord bass).
+  String get labelNoteName => key.applyTo(clef.noteAt(labelStep)).pitchName;
+
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
@@ -50,7 +66,11 @@ class NotationPainter extends CustomPainter {
     _paintClef(canvas);
     _paintKeySignature(canvas);
     _paintLedgerLines(canvas, linePaint);
-    _paintNote(canvas);
+    if (chordSteps.isEmpty) {
+      _paintNote(canvas);
+    } else {
+      _paintChord(canvas);
+    }
     if (showLabel) {
       _paintLabel(canvas);
     }
@@ -68,11 +88,7 @@ class NotationPainter extends CustomPainter {
   }
 
   void _paintClef(Canvas canvas) {
-    final painter = _layoutGlyph(
-      clef.glyph,
-      geometry.space * 4,
-      lineColor,
-    );
+    final painter = _layoutGlyph(clef.glyph, geometry.space * 4, lineColor);
     _paintGlyph(
       canvas,
       painter,
@@ -92,26 +108,25 @@ class NotationPainter extends CustomPainter {
         geometry.space * 4,
         lineColor,
       );
-      _paintGlyph(
-        canvas,
-        glyph,
-        x: x,
-        baselineY: geometry.yForStep(item.step),
-      );
+      _paintGlyph(canvas, glyph, x: x, baselineY: geometry.yForStep(item.step));
       x += spacing;
     }
   }
 
   void _paintLedgerLines(Canvas canvas, Paint paint) {
-    final steps = geometry.ledgerStepsFor(step.round());
+    final notes = chordSteps.isEmpty ? [step.round()] : chordSteps;
     final halfWidth = geometry.space * 0.95;
-    for (final ledgerStep in steps) {
-      final y = geometry.yForStep(ledgerStep);
-      canvas.drawLine(
-        Offset(noteX - halfWidth, y),
-        Offset(noteX + halfWidth, y),
-        paint,
-      );
+    final drawn = <int>{};
+    for (final note in notes) {
+      for (final ledgerStep in geometry.ledgerStepsFor(note)) {
+        if (!drawn.add(ledgerStep)) continue;
+        final y = geometry.yForStep(ledgerStep);
+        canvas.drawLine(
+          Offset(noteX - halfWidth, y),
+          Offset(noteX + halfWidth, y),
+          paint,
+        );
+      }
     }
   }
 
@@ -141,8 +156,51 @@ class NotationPainter extends CustomPainter {
     _paintGlyph(canvas, notehead, centerX: noteX, baselineY: noteY);
   }
 
+  void _paintChord(Canvas canvas) {
+    final rootStep = chordSteps.firstWhere(
+      (chordStep) => chordStep % 7 == step.round() % 7,
+      orElse: () => chordSteps.first,
+    );
+    final headHalfWidth =
+        _layoutGlyph(
+          NotationGlyphs.noteheadBlack,
+          geometry.space * 4,
+          noteColor,
+        ).width /
+        2;
+    final stemUp = chordSteps.first < 4;
+    final stemLength = geometry.space * 3.5;
+    final stemPaint = Paint()
+      ..color = chordColor
+      ..strokeWidth = (geometry.space * 0.12).clamp(1.2, 4.0)
+      ..strokeCap = StrokeCap.round;
+
+    final lowest = geometry.yForStep(chordSteps.first);
+    final highest = geometry.yForStep(chordSteps.last);
+    final stemX = noteX + (stemUp ? headHalfWidth : -headHalfWidth);
+    canvas.drawLine(
+      Offset(stemX, stemUp ? lowest : highest),
+      Offset(stemX, stemUp ? highest - stemLength : lowest + stemLength),
+      stemPaint,
+    );
+
+    for (final chordStep in chordSteps) {
+      final notehead = _layoutGlyph(
+        NotationGlyphs.noteheadBlack,
+        geometry.space * 4,
+        chordStep == rootStep ? noteColor : chordColor,
+      );
+      _paintGlyph(
+        canvas,
+        notehead,
+        centerX: noteX,
+        baselineY: geometry.yForStep(chordStep),
+      );
+    }
+  }
+
   void _paintLabel(Canvas canvas) {
-    final note = key.applyTo(clef.noteAt(step.round()));
+    final note = key.applyTo(clef.noteAt(labelStep));
     final painter = TextPainter(
       text: TextSpan(
         text: note.pitchName,
@@ -160,7 +218,7 @@ class NotationPainter extends CustomPainter {
     if (x + painter.width > geometry.staffRight) {
       x = noteX - gap - painter.width;
     }
-    final y = geometry.yForStep(step) - painter.height / 2;
+    final y = geometry.yForStep(labelStep.toDouble()) - painter.height / 2;
 
     final pad = geometry.space * 0.25;
     final background = RRect.fromRectAndRadius(
@@ -198,8 +256,9 @@ class NotationPainter extends CustomPainter {
     double? centerX,
     required double baselineY,
   }) {
-    final baselineOffset =
-        painter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+    final baselineOffset = painter.computeDistanceToActualBaseline(
+      TextBaseline.alphabetic,
+    );
     final dx = centerX != null ? centerX - painter.width / 2 : (x ?? 0);
     painter.paint(canvas, Offset(dx, baselineY - baselineOffset));
   }
@@ -216,6 +275,8 @@ class NotationPainter extends CustomPainter {
         old.noteColor != noteColor ||
         old.labelColor != labelColor ||
         old.labelBackgroundColor != labelBackgroundColor ||
-        old.showLabel != showLabel;
+        old.showLabel != showLabel ||
+        !listEquals(old.chordSteps, chordSteps) ||
+        old.chordColor != chordColor;
   }
 }

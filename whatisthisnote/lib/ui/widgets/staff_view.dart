@@ -15,6 +15,7 @@ class StaffView extends StatefulWidget {
     required this.keySignature,
     required this.step,
     required this.onStepChanged,
+    this.chordSteps = const [],
     this.minStep = -6,
     this.maxStep = 14,
   });
@@ -24,6 +25,9 @@ class StaffView extends StatefulWidget {
 
   /// The settled (integer) staff step.
   final int step;
+
+  /// Staff steps of an optional chord to draw around the note, low to high.
+  final List<int> chordSteps;
 
   /// Called whenever the snapped step changes, including while dragging.
   final ValueChanged<int> onStepChanged;
@@ -128,7 +132,7 @@ class _StaffViewState extends State<StaffView>
     final signatureWidth = widget.keySignature.signatureCount == 0
         ? 0.0
         : geometry.space * 0.2 +
-            widget.keySignature.signatureCount * geometry.space * 0.9;
+              widget.keySignature.signatureCount * geometry.space * 0.9;
     return clefRight + signatureWidth + geometry.space * 0.9;
   }
 
@@ -177,6 +181,8 @@ class _StaffViewState extends State<StaffView>
               labelColor: scheme.primary,
               labelBackgroundColor: scheme.surface,
               showLabel: true,
+              chordSteps: widget.chordSteps,
+              chordColor: scheme.tertiary,
             ),
           ),
         );

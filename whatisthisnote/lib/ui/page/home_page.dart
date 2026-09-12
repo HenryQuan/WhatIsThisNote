@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/chord.dart';
 import '../../core/clef.dart';
 import '../../core/key.dart';
+import '../../core/note.dart';
 import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
 import '../widgets/piano_keyboard.dart';
@@ -30,6 +32,11 @@ class _HomePageState extends State<HomePage> {
   /// Optional scale highlight (an add-on), off by default.
   ScaleType? _scaleType;
 
+  /// Optional chord lab (an add-on), off by default.
+  ChordMode _chordMode = ChordMode.off;
+  int _inversion = 0;
+  ChordProgression? _progression;
+
   /// Middle line of the treble staff (B4).
   int _step = 4;
 
@@ -37,11 +44,65 @@ class _HomePageState extends State<HomePage> {
     setState(() => _step = step.clamp(kMinStaffStep, kMaxStaffStep));
   }
 
+  Scale? get _selectedScale => _scaleType == null
+      ? null
+      : Scale(_key.tonic, _key.tonicPitchClass, _scaleType!);
+
+  /// The seven-note scale used to build chords. Falls back to the key's major
+  /// or natural minor scale when the highlight set is not heptatonic.
+  Scale _chordScale(Scale? selected) {
+    if (selected != null && selected.isHeptatonic) return selected;
+    return Scale(
+      _key.tonic,
+      _key.tonicPitchClass,
+      _key.mode == KeyMode.major ? ScaleType.major : ScaleType.naturalMinor,
+    );
+  }
+
+  /// Numbered scale degree (1..7) of a written note, by letter.
+  static int _degreeOf(Note note, Scale scale) {
+    var relative = (note.letter.index - scale.tonicLetter.index) % 7;
+    if (relative < 0) relative += 7;
+    return relative + 1;
+  }
+
+  /// The diatonic chord built on [note]'s scale degree, or `null` when the
+  /// chord lab is off or [note] is not in [scale].
+  Chord? _chordFor(Scale scale, Note note) {
+    if (_chordMode == ChordMode.off) return null;
+    if (!scale.pitchClasses.contains(note.midi % 12)) return null;
+    return Chord.diatonic(
+      scale,
+      _degreeOf(note, scale),
+      seventh: _chordMode == ChordMode.sevenths,
+      inversion: _inversion,
+    );
+  }
+
+  void _setChordMode(ChordMode mode) {
+    setState(() {
+      _chordMode = mode;
+      final max = mode == ChordMode.sevenths ? 3 : 2;
+      if (_inversion > max) _inversion = 0;
+    });
+  }
+
+  /// Moves the note to the nearest position with [degree] (used by the
+  /// progression chips).
+  void _moveToDegree(int degree) {
+    final scale = _chordScale(_selectedScale);
+    final note = _key.applyTo(_clef.noteAt(_step));
+    var delta = (degree - _degreeOf(note, scale)) % 7;
+    if (delta > 3) delta -= 7;
+    _setStep(_step + delta);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scale = _scaleType == null
-        ? null
-        : Scale(_key.tonic, _key.tonicPitchClass, _scaleType!);
+    final scale = _selectedScale;
+    final chordScale = _chordScale(scale);
+    final note = _key.applyTo(_clef.noteAt(_step));
+    final chord = _chordFor(chordScale, note);
 
     return Scaffold(
       appBar: AppBar(
@@ -62,17 +123,11 @@ class _HomePageState extends State<HomePage> {
               ),
               PopupMenuItem(
                 value: ThemeMode.light,
-                child: _ThemeOption(
-                  icon: Icons.light_mode,
-                  label: 'Light',
-                ),
+                child: _ThemeOption(icon: Icons.light_mode, label: 'Light'),
               ),
               PopupMenuItem(
                 value: ThemeMode.dark,
-                child: _ThemeOption(
-                  icon: Icons.dark_mode,
-                  label: 'Dark',
-                ),
+                child: _ThemeOption(icon: Icons.dark_mode, label: 'Dark'),
               ),
             ],
           ),
@@ -86,6 +141,7 @@ class _HomePageState extends State<HomePage> {
                 clef: _clef,
                 keySignature: _key,
                 step: _step,
+                chordSteps: chord?.staffSteps(_step) ?? const [],
                 onStepChanged: (step) {
                   if (step != _step) setState(() => _step = step);
                 },
@@ -96,10 +152,20 @@ class _HomePageState extends State<HomePage> {
               clef: _clef,
               keySignature: _key,
               scale: scale,
+              chord: chord,
+              chordScale: chordScale,
+              chordMode: _chordMode,
+              inversion: chord?.inversion ?? 0,
+              progression: _progression,
               step: _step,
               onClefChanged: (clef) => setState(() => _clef = clef),
               onKeyChanged: (key) => setState(() => _key = key),
               onScaleTypeChanged: (type) => setState(() => _scaleType = type),
+              onChordModeChanged: _setChordMode,
+              onInversionChanged: (value) => setState(() => _inversion = value),
+              onProgressionChanged: (value) =>
+                  setState(() => _progression = value),
+              onDegreeSelected: _moveToDegree,
               onStepChanged: _setStep,
             ),
           ],
@@ -126,20 +192,38 @@ class _Controls extends StatelessWidget {
     required this.clef,
     required this.keySignature,
     required this.scale,
+    required this.chord,
+    required this.chordScale,
+    required this.chordMode,
+    required this.inversion,
+    required this.progression,
     required this.step,
     required this.onClefChanged,
     required this.onKeyChanged,
     required this.onScaleTypeChanged,
+    required this.onChordModeChanged,
+    required this.onInversionChanged,
+    required this.onProgressionChanged,
+    required this.onDegreeSelected,
     required this.onStepChanged,
   });
 
   final Clef clef;
   final MusicalKey keySignature;
   final Scale? scale;
+  final Chord? chord;
+  final Scale chordScale;
+  final ChordMode chordMode;
+  final int inversion;
+  final ChordProgression? progression;
   final int step;
   final ValueChanged<Clef> onClefChanged;
   final ValueChanged<MusicalKey> onKeyChanged;
   final ValueChanged<ScaleType?> onScaleTypeChanged;
+  final ValueChanged<ChordMode> onChordModeChanged;
+  final ValueChanged<int> onInversionChanged;
+  final ValueChanged<ChordProgression?> onProgressionChanged;
+  final ValueChanged<int> onDegreeSelected;
   final ValueChanged<int> onStepChanged;
 
   @override
@@ -157,131 +241,179 @@ class _Controls extends StatelessWidget {
         : theme.colorScheme.onSurfaceVariant;
     final badgeLabel = scale == null ? '${note.degree}' : (scaleDegree ?? '–');
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.72,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          note.name,
-                          key: const Key('note-name'),
-                          style: theme.textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              note.name,
+                              key: const Key('note-name'),
+                              style: theme.textTheme.displaySmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              note.solfege,
+                              key: const Key('note-solfege'),
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
                         Text(
-                          note.solfege,
-                          key: const Key('note-solfege'),
-                          style: theme.textTheme.headlineSmall?.copyWith(
+                          '${clef.label} clef  ·  drag the note or tap the staff',
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
-                      ],
-                    ),
-                    Text(
-                      '${clef.label} clef  ·  drag the note or tap the staff',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: badgeColor,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            badgeLabel,
-                            key: const Key('note-degree'),
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: badgeTextColor,
-                              fontWeight: FontWeight.bold,
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: badgeColor,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                badgeLabel,
+                                key: const Key('note-degree'),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: badgeTextColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            scale == null
-                                ? 'numbered notation (1 = Do … 8 = Do)'
-                                : '${scale!.label} · '
-                                    '${inScale ? 'degree $scaleDegree' : 'outside scale'}',
-                            key: const Key('note-scale-caption'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                scale == null
+                                    ? 'numbered notation (1 = Do … 8 = Do)'
+                                    : '${scale!.label} · '
+                                          '${inScale ? 'degree $scaleDegree' : 'outside scale'}',
+                                key: const Key('note-scale-caption'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton.filledTonal(
-                    onPressed: step < kMaxStaffStep
-                        ? () => onStepChanged(step + 1)
-                        : null,
-                    icon: const Icon(Icons.keyboard_arrow_up),
-                    tooltip: 'Higher',
                   ),
-                  IconButton.filledTonal(
-                    onPressed: step > kMinStaffStep
-                        ? () => onStepChanged(step - 1)
-                        : null,
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    tooltip: 'Lower',
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton.filledTonal(
+                        onPressed: step < kMaxStaffStep
+                            ? () => onStepChanged(step + 1)
+                            : null,
+                        icon: const Icon(Icons.keyboard_arrow_up),
+                        tooltip: 'Higher',
+                      ),
+                      IconButton.filledTonal(
+                        onPressed: step > kMinStaffStep
+                            ? () => onStepChanged(step - 1)
+                            : null,
+                        icon: const Icon(Icons.keyboard_arrow_down),
+                        tooltip: 'Lower',
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          PianoKeyboard(
-            midi: note.midi,
-            label: note.pitchName,
-            highlightPitchClasses: scale?.pitchClasses,
-          ),
-          const SizedBox(height: 12),
-          SegmentedButton<Clef>(
-            showSelectedIcon: false,
-            segments: [
-              for (final value in Clef.values)
-                ButtonSegment<Clef>(
-                  value: value,
-                  label: Text(value.label),
+              if (chordMode != ChordMode.off) ...[
+                const SizedBox(height: 12),
+                _ChordReadout(chord: chord, chordScale: chordScale),
+              ],
+              const SizedBox(height: 12),
+              PianoKeyboard(
+                midi: note.midi,
+                label: note.pitchName,
+                highlightPitchClasses: scale?.pitchClasses,
+                chordPitchClasses: chord?.pitchClassSet,
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<Clef>(
+                showSelectedIcon: false,
+                segments: [
+                  for (final value in Clef.values)
+                    ButtonSegment<Clef>(value: value, label: Text(value.label)),
+                ],
+                selected: {clef},
+                onSelectionChanged: (selection) =>
+                    onClefChanged(selection.first),
+              ),
+              const SizedBox(height: 8),
+              _KeySelector(value: keySignature, onChanged: onKeyChanged),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ScaleSelector(
+                      value: scale?.type,
+                      onChanged: onScaleTypeChanged,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _ChordSelector(
+                      value: chordMode,
+                      onChanged: onChordModeChanged,
+                    ),
+                  ),
+                ],
+              ),
+              if (chordMode != ChordMode.off) ...[
+                const SizedBox(height: 8),
+                _InversionSelector(
+                  value: inversion,
+                  count: chordMode == ChordMode.sevenths ? 4 : 3,
+                  onChanged: onInversionChanged,
                 ),
+                const SizedBox(height: 8),
+                _ProgressionSelector(
+                  value: progression,
+                  onChanged: onProgressionChanged,
+                ),
+                if (progression != null) ...[
+                  const SizedBox(height: 8),
+                  _ProgressionChips(
+                    progression: progression!,
+                    scale: chordScale,
+                    seventh: chordMode == ChordMode.sevenths,
+                    onSelected: onDegreeSelected,
+                  ),
+                ],
+              ],
             ],
-            selected: {clef},
-            onSelectionChanged: (selection) => onClefChanged(selection.first),
           ),
-          const SizedBox(height: 8),
-          _KeySelector(value: keySignature, onChanged: onKeyChanged),
-          const SizedBox(height: 8),
-          _ScaleSelector(value: scale?.type, onChanged: onScaleTypeChanged),
-        ],
+        ),
       ),
     );
   }
@@ -405,6 +537,220 @@ class _ScaleOption {
   final ScaleType? type;
 }
 
+class _ChordSelector extends StatelessWidget {
+  const _ChordSelector({required this.value, required this.onChanged});
+
+  final ChordMode value;
+  final ValueChanged<ChordMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<ChordMode>(
+      tooltip: 'Chords',
+      initialValue: value,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        for (final mode in ChordMode.values)
+          PopupMenuItem<ChordMode>(value: mode, child: Text(mode.label)),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.multitrack_audio, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Chords: ${value.label}',
+                key: const Key('chord-label'),
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InversionSelector extends StatelessWidget {
+  const _InversionSelector({
+    required this.value,
+    required this.count,
+    required this.onChanged,
+  });
+
+  final int value;
+  final int count;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Root', '1st', '2nd', '3rd'];
+    return SegmentedButton<int>(
+      showSelectedIcon: false,
+      segments: [
+        for (var i = 0; i < count; i++)
+          ButtonSegment<int>(value: i, label: Text(labels[i])),
+      ],
+      selected: {value.clamp(0, count - 1)},
+      onSelectionChanged: (selection) => onChanged(selection.first),
+    );
+  }
+}
+
+class _ProgressionSelector extends StatelessWidget {
+  const _ProgressionSelector({required this.value, required this.onChanged});
+
+  final ChordProgression? value;
+  final ValueChanged<ChordProgression?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<_ProgressionOption>(
+      tooltip: 'Progression',
+      onSelected: (option) => onChanged(option.value),
+      itemBuilder: (context) => [
+        const PopupMenuItem<_ProgressionOption>(
+          value: _ProgressionOption(null),
+          child: Text('Off'),
+        ),
+        const PopupMenuDivider(),
+        for (final progression in kProgressions)
+          PopupMenuItem<_ProgressionOption>(
+            value: _ProgressionOption(progression),
+            child: Text(progression.name),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.queue_music, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Progression: ${value?.name ?? 'Off'}',
+                key: const Key('progression-label'),
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgressionOption {
+  const _ProgressionOption(this.value);
+
+  final ChordProgression? value;
+}
+
+class _ProgressionChips extends StatelessWidget {
+  const _ProgressionChips({
+    required this.progression,
+    required this.scale,
+    required this.seventh,
+    required this.onSelected,
+  });
+
+  final ChordProgression progression;
+  final Scale scale;
+  final bool seventh;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      key: const Key('progression-chips'),
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < progression.degrees.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            ActionChip(
+              key: Key('prog-$i'),
+              visualDensity: VisualDensity.compact,
+              label: Text(
+                Chord.diatonic(
+                  scale,
+                  progression.degrees[i],
+                  seventh: seventh,
+                ).romanNumeral,
+              ),
+              onPressed: () => onSelected(progression.degrees[i]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ChordReadout extends StatelessWidget {
+  const _ChordReadout({required this.chord, required this.chordScale});
+
+  final Chord? chord;
+  final Scale chordScale;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final chord = this.chord;
+    final caption = chord == null
+        ? 'chromatic note \u2013 no diatonic chord'
+        : '${chord.romanNumeral}  ·  ${chord.quality.label}  ·  '
+              '${chord.inversionLabel} in ${chordScale.label}';
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: scheme.tertiaryContainer,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            chord?.displaySymbol ?? '\u2013',
+            key: const Key('chord-symbol'),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: scheme.onTertiaryContainer,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            caption,
+            key: const Key('chord-caption'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MenuHeader extends StatelessWidget {
   const _MenuHeader(this.label);
 
@@ -432,12 +778,6 @@ class _ThemeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon),
-        const SizedBox(width: 12),
-        Text(label),
-      ],
-    );
+    return Row(children: [Icon(icon), const SizedBox(width: 12), Text(label)]);
   }
 }

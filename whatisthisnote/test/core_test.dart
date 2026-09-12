@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/core/accidental.dart';
+import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/note.dart';
@@ -35,8 +36,10 @@ void main() {
 
     test('pitch names omit the octave but keep the accidental', () {
       expect(Note.fromLetter(NoteLetter.g, 4).pitchName, 'G');
-      final fSharp = Note.fromLetter(NoteLetter.f, 4)
-          .withAccidental(Accidental.sharp);
+      final fSharp = Note.fromLetter(
+        NoteLetter.f,
+        4,
+      ).withAccidental(Accidental.sharp);
       expect(fSharp.pitchName, 'F\u266F');
       expect(fSharp.name, 'F\u266F4');
     });
@@ -208,15 +211,11 @@ void main() {
     test('signatures grow in the standard order', () {
       final dMajor = MusicalKey('D', KeyMode.major, 2);
       final treble = dMajor.signatureFor(Clef.treble);
-      expect(treble.map((e) => e.accidental),
-          everyElement(Accidental.sharp));
+      expect(treble.map((e) => e.accidental), everyElement(Accidental.sharp));
       expect(treble.map((e) => e.step), [8, 5]);
 
       final bFlatMajor = MusicalKey('B\u266D', KeyMode.major, -2);
-      expect(
-        bFlatMajor.signatureFor(Clef.treble).map((e) => e.step),
-        [4, 7],
-      );
+      expect(bFlatMajor.signatureFor(Clef.treble).map((e) => e.step), [4, 7]);
     });
 
     test('C major and A minor have empty signatures', () {
@@ -265,16 +264,25 @@ void main() {
 
     test('reports scale degrees and notes outside the scale', () {
       const cBlues = Scale('C', 0, ScaleType.blues);
-      final eFlat = Note.fromLetter(NoteLetter.e, 4)
-          .withAccidental(Accidental.flat);
+      final eFlat = Note.fromLetter(
+        NoteLetter.e,
+        4,
+      ).withAccidental(Accidental.flat);
       expect(cBlues.degreeLabelFor(eFlat.midi), '\u266D3');
-      expect(cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.f, 4).midi),
-          '4');
-      expect(cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.f, 4)
-          .withAccidental(Accidental.sharp)
-          .midi), '\u266D5');
-      expect(cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.d, 4).midi),
-          isNull);
+      expect(cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.f, 4).midi), '4');
+      expect(
+        cBlues.degreeLabelFor(
+          Note.fromLetter(
+            NoteLetter.f,
+            4,
+          ).withAccidental(Accidental.sharp).midi,
+        ),
+        '\u266D5',
+      );
+      expect(
+        cBlues.degreeLabelFor(Note.fromLetter(NoteLetter.d, 4).midi),
+        isNull,
+      );
       expect(cBlues.label, 'C Blues');
     });
 
@@ -284,6 +292,106 @@ void main() {
 
       const melodic = Scale('C', 0, ScaleType.melodicMinor);
       expect(melodic.pitchClasses, {0, 2, 3, 5, 7, 9, 11});
+    });
+  });
+
+  group('Chord', () {
+    const cMajor = Scale('C', 0, ScaleType.major);
+
+    test('builds the diatonic triads of a major key', () {
+      final chords = [
+        for (var degree = 1; degree <= 7; degree++)
+          Chord.diatonic(cMajor, degree),
+      ];
+      expect(chords.map((c) => c.symbol), [
+        'C',
+        'Dm',
+        'Em',
+        'F',
+        'G',
+        'Am',
+        'Bdim',
+      ]);
+      expect(chords.map((c) => c.romanNumeral), [
+        'I',
+        'ii',
+        'iii',
+        'IV',
+        'V',
+        'vi',
+        'vii\u00B0',
+      ]);
+      expect(chords[0].quality, ChordQuality.major);
+      expect(chords[1].quality, ChordQuality.minor);
+      expect(chords[6].quality, ChordQuality.diminished);
+    });
+
+    test('builds the diatonic seventh chords of a major key', () {
+      final chords = [
+        for (var degree = 1; degree <= 7; degree++)
+          Chord.diatonic(cMajor, degree, seventh: true),
+      ];
+      expect(chords.map((c) => c.symbol), [
+        'Cmaj7',
+        'Dm7',
+        'Em7',
+        'Fmaj7',
+        'G7',
+        'Am7',
+        'Bm7\u266D5',
+      ]);
+      expect(chords.map((c) => c.romanNumeral), [
+        'Imaj7',
+        'ii7',
+        'iii7',
+        'IVmaj7',
+        'V7',
+        'vi7',
+        'vii\u00F87',
+      ]);
+      expect(chords[4].quality, ChordQuality.dominantSeventh);
+      expect(chords[4].pitchClasses, [7, 11, 2, 5]);
+      expect(chords[6].quality, ChordQuality.halfDiminishedSeventh);
+    });
+
+    test('rotates the chord tones for inversions', () {
+      final c = Chord.diatonic(cMajor, 1);
+      expect(c.pitchClasses, [0, 4, 7]);
+      expect(c.displaySymbol, 'C');
+
+      final first = Chord.diatonic(cMajor, 1, inversion: 1);
+      expect(first.pitchClasses, [4, 7, 0]);
+      expect(first.bassName, 'E');
+      expect(first.displaySymbol, 'C/E');
+      expect(first.inversionLabel, '1st inversion');
+
+      final second = Chord.diatonic(cMajor, 1, inversion: 2);
+      expect(second.pitchClasses, [7, 0, 4]);
+      expect(second.bassName, 'G');
+      expect(second.displaySymbol, 'C/G');
+    });
+
+    test('voices the chord as staff steps', () {
+      final c = Chord.diatonic(cMajor, 1);
+      expect(c.staffSteps(4), [4, 6, 8]);
+      expect(Chord.diatonic(cMajor, 1, inversion: 1).staffSteps(4), [6, 8, 11]);
+      expect(Chord.diatonic(cMajor, 1, inversion: 2).staffSteps(4), [
+        8,
+        11,
+        13,
+      ]);
+    });
+
+    test('uses flat numerals in minor keys', () {
+      const aMinor = Scale('A', 9, ScaleType.naturalMinor);
+      expect(Chord.diatonic(aMinor, 1).romanNumeral, 'i');
+      expect(Chord.diatonic(aMinor, 3).romanNumeral, '\u266DIII');
+      expect(Chord.diatonic(aMinor, 7).romanNumeral, '\u266DVII');
+    });
+
+    test('lists playable progressions', () {
+      expect(kProgressions, isNotEmpty);
+      expect(kProgressions.first.degrees, [1, 5, 6, 4]);
     });
   });
 }
