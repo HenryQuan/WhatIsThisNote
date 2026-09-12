@@ -7,6 +7,8 @@ Drag the note up and down the staff and the app tells you what the note is,
 automatically drawing ledger lines when the note goes above or below the five
 lines.
 
+DeepSeek has implemented everything after 7 years in one afternoon. I am shocked how far we have came. I always wanted to get this app out, so I can read notes faster. Now, I finally can and learn music theory better than before.
+
 ## Features
 
 - [x] Simple and clean Material 3 UI
@@ -40,10 +42,6 @@ shows no chord for chromatic notes. Progressions are selected and tapped
 rather than played (there is no audio engine). Sharps and flats in the guided
 path come from key signatures, so the path does not yet show accidentals that
 are not in the key.
-
-### Pro features
-
-- [ ] Quiz (time attack with levels)
 
 ## Getting started
 
