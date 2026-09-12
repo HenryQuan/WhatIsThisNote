@@ -744,6 +744,46 @@ void main() {
 
     expect(_paintedStep(tester), lessThan(5.0));
   });
+
+  testWidgets('space plays the current note', (tester) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+
+    // The default note is B4 (MIDI 71, A4 == 440 Hz).
+    expect(player.played, hasLength(1));
+    expect(player.played.single, hasLength(1));
+    expect(player.played.single.single, closeTo(493.883, 0.01));
+  });
+
+  testWidgets('a wide window packs the controls and grows the staff', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(600, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+    final narrowStaff = tester.getSize(find.byType(StaffView)).height;
+
+    await tester.binding.setSurfaceSize(const Size(900, 600));
+    await tester.pumpAndSettle();
+    final wideStaff = tester.getSize(find.byType(StaffView)).height;
+
+    expect(wideStaff, greaterThan(narrowStaff));
+
+    final scrollable = find.descendant(
+      of: find.byKey(const Key('controls')),
+      matching: find.byType(Scrollable),
+    );
+    expect(
+      tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
+      0,
+      reason: 'the compact controls should not need to scroll',
+    );
+  });
 }
 
 double _paintedStep(WidgetTester tester) {

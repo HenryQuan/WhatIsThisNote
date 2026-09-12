@@ -451,6 +451,27 @@ void main() {
       expect(builder.noteNames, isNot(contains('F')));
     });
 
+    test('moves around the staff in small leaps', () {
+      final builder = QuizBuilder(
+        clef: Clef.treble,
+        key: kMajorKeys.first,
+        random: Random(7),
+      );
+      var previous = builder.next().step;
+      var smallLeaps = 0;
+      const rounds = 200;
+      for (var i = 0; i < rounds; i++) {
+        final step = builder.next().step;
+        expect(QuizBuilder.steps, contains(step));
+        final delta = (step - previous).abs();
+        if (delta == QuizBuilder.minLeap || delta == QuizBuilder.maxLeap) {
+          smallLeaps++;
+        }
+        previous = step;
+      }
+      expect(smallLeaps, greaterThan(rounds * 0.5));
+    });
+
     test('reads the answer with the clef', () {
       final treble = QuizBuilder(
         clef: Clef.treble,

@@ -273,7 +273,8 @@ class _StaffViewState extends State<StaffView>
                 : _semanticNameAt(widget.step - 1),
             hint:
                 'Drag up or down to change the pitch, or tap a line to jump '
-                'there. Use the arrow keys on a keyboard.',
+                'there. Use the arrow keys on a keyboard, or press space to '
+                'hear the note.',
             onIncrease: value == null ? null : () => _nudge(1),
             onDecrease: value == null ? null : () => _nudge(-1),
             child: GestureDetector(

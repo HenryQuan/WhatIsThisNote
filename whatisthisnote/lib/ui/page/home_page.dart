@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../audio/note_player.dart';
 import '../../core/chord.dart';
@@ -85,10 +86,51 @@ class _HomePageState extends State<HomePage> {
   NotePlayer get _notePlayer =>
       widget.notePlayer ?? (_ownedPlayer ??= AudioNotePlayer());
 
+  /// Catches app-wide keyboard shortcuts (arrow keys, space) that bubble up
+  /// from the focused control.
+  final FocusNode _keyboardFocus = FocusNode(debugLabel: 'home-shortcuts');
+
   @override
   void dispose() {
+    _keyboardFocus.dispose();
     _ownedPlayer?.dispose();
     super.dispose();
+  }
+
+  /// Plays whatever is currently shown, including the chord-lab voicing.
+  void _playCurrent() {
+    final scale = _selectedScale;
+    final note = _key.applyTo(_clef.noteAt(_step));
+    _playSound(note, _chordFor(_chordScale(scale), note));
+  }
+
+  /// Whether the keyboard focus is on a button, so space/arrows should keep
+  /// their normal button behaviour instead of being treated as shortcuts.
+  bool _focusIsInteractive() {
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context == null) return false;
+    return context.findAncestorWidgetOfExactType<ButtonStyleButton>() != null ||
+        context.findAncestorWidgetOfExactType<InkWell>() != null;
+  }
+
+  KeyEventResult _onShortcut(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (_focusIsInteractive()) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _setStep(_step + 1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _setStep(_step - 1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.space) {
+      _playCurrent();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   /// Plays the written [note], or [chord]'s tones when the chord lab is on.
@@ -313,150 +355,156 @@ class _HomePageState extends State<HomePage> {
     final note = _key.applyTo(_clef.noteAt(_step));
     final chord = _chordFor(chordScale, note);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'What is this note?',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+    return Focus(
+      focusNode: _keyboardFocus,
+      autofocus: true,
+      onKeyEvent: _onShortcut,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'What is this note?',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'Practice',
+              isSelected: _practice,
+              icon: const Icon(Icons.quiz),
+              onPressed: _practice ? _exitPractice : _startPractice,
+            ),
+            IconButton(
+              tooltip: 'Guided path',
+              isSelected: _guided,
+              icon: const Icon(Icons.school),
+              onPressed: _guided ? _exitGuided : _startGuided,
+            ),
+            IconButton(
+              key: const Key('display-settings'),
+              tooltip: 'Display',
+              icon: const Icon(Icons.tune),
+              onPressed: _openDisplaySettings,
+            ),
+            PopupMenuButton<ThemeMode>(
+              tooltip: 'Theme',
+              icon: Icon(_themeIcon(widget.themeMode)),
+              initialValue: widget.themeMode,
+              onSelected: widget.onThemeModeChanged,
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: ThemeMode.system,
+                  child: _ThemeOption(
+                    icon: Icons.brightness_auto,
+                    label: 'System',
+                  ),
+                ),
+                PopupMenuItem(
+                  value: ThemeMode.light,
+                  child: _ThemeOption(icon: Icons.light_mode, label: 'Light'),
+                ),
+                PopupMenuItem(
+                  value: ThemeMode.dark,
+                  child: _ThemeOption(icon: Icons.dark_mode, label: 'Dark'),
+                ),
+              ],
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Practice',
-            isSelected: _practice,
-            icon: const Icon(Icons.quiz),
-            onPressed: _practice ? _exitPractice : _startPractice,
-          ),
-          IconButton(
-            tooltip: 'Guided path',
-            isSelected: _guided,
-            icon: const Icon(Icons.school),
-            onPressed: _guided ? _exitGuided : _startGuided,
-          ),
-          IconButton(
-            key: const Key('display-settings'),
-            tooltip: 'Display',
-            icon: const Icon(Icons.tune),
-            onPressed: _openDisplaySettings,
-          ),
-          PopupMenuButton<ThemeMode>(
-            tooltip: 'Theme',
-            icon: Icon(_themeIcon(widget.themeMode)),
-            initialValue: widget.themeMode,
-            onSelected: widget.onThemeModeChanged,
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: ThemeMode.system,
-                child: _ThemeOption(
-                  icon: Icons.brightness_auto,
-                  label: 'System',
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    StaffView(
+                      clef: _clef,
+                      keySignature: _key,
+                      step: _step,
+                      chordSteps: chord?.staffSteps(_step) ?? const [],
+                      targetStep: _guidedTarget,
+                      showLabel:
+                          widget.display.showStaffLabel &&
+                          (!_practice || _answered != null),
+                      interactive: !_practice,
+                      naming: widget.display.naming,
+                      showEnharmonic: widget.display.showEnharmonic,
+                      semanticValue: (!_practice || _answered != null)
+                          ? note.name
+                          : null,
+                      onStepChanged: (step) {
+                        if (step != _step) setState(() => _step = step);
+                      },
+                    ),
+                    if (widget.showCoachMark && !_practice && !_guided)
+                      Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 12,
+                        child: _CoachMark(
+                          onDismiss: widget.onCoachMarkDismissed ?? () {},
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              PopupMenuItem(
-                value: ThemeMode.light,
-                child: _ThemeOption(icon: Icons.light_mode, label: 'Light'),
-              ),
-              PopupMenuItem(
-                value: ThemeMode.dark,
-                child: _ThemeOption(icon: Icons.dark_mode, label: 'Dark'),
-              ),
+              if (_guided)
+                _GuidedPanel(
+                  key: const Key('guided-panel'),
+                  lesson: _lesson,
+                  step: _lessonStep,
+                  lessonIndex: _lessonIndex,
+                  stepIndex: _stepIndex,
+                  totalSteps: _totalSteps,
+                  completedSteps: _completedSteps,
+                  isLastStep: _isLastStep,
+                  matched: _practiceMatched,
+                  onBack: _previousLessonStep,
+                  onNext: _nextLessonStep,
+                  onExit: _exitGuided,
+                )
+              else if (_practice && _question != null)
+                _PracticePanel(
+                  key: const Key('practice-panel'),
+                  question: _question!,
+                  answered: _answered,
+                  attempts: _attempts,
+                  correctAnswers: _correctAnswers,
+                  streak: _streak,
+                  bestStreak: _bestStreak,
+                  onAnswer: _answerPractice,
+                  onNext: _nextPracticeQuestion,
+                  onReset: _resetPracticeScore,
+                  onExit: _exitPractice,
+                )
+              else
+                _Controls(
+                  key: const Key('controls'),
+                  clef: _clef,
+                  keySignature: _key,
+                  display: widget.display,
+                  scale: scale,
+                  chord: chord,
+                  chordScale: chordScale,
+                  chordMode: _chordMode,
+                  inversion: chord?.inversion ?? 0,
+                  progression: _progression,
+                  step: _step,
+                  onPlay: () => _playSound(note, chord),
+                  onClefChanged: (clef) => setState(() => _clef = clef),
+                  onKeyChanged: (key) => setState(() => _key = key),
+                  onScaleTypeChanged: (type) =>
+                      setState(() => _scaleType = type),
+                  onChordModeChanged: _setChordMode,
+                  onInversionChanged: (value) =>
+                      setState(() => _inversion = value),
+                  onProgressionChanged: (value) =>
+                      setState(() => _progression = value),
+                  onDegreeSelected: _moveToDegree,
+                  onStepChanged: _setStep,
+                ),
             ],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  StaffView(
-                    clef: _clef,
-                    keySignature: _key,
-                    step: _step,
-                    chordSteps: chord?.staffSteps(_step) ?? const [],
-                    targetStep: _guidedTarget,
-                    showLabel:
-                        widget.display.showStaffLabel &&
-                        (!_practice || _answered != null),
-                    interactive: !_practice,
-                    naming: widget.display.naming,
-                    showEnharmonic: widget.display.showEnharmonic,
-                    semanticValue: (!_practice || _answered != null)
-                        ? note.name
-                        : null,
-                    onStepChanged: (step) {
-                      if (step != _step) setState(() => _step = step);
-                    },
-                  ),
-                  if (widget.showCoachMark && !_practice && !_guided)
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 12,
-                      child: _CoachMark(
-                        onDismiss: widget.onCoachMarkDismissed ?? () {},
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (_guided)
-              _GuidedPanel(
-                key: const Key('guided-panel'),
-                lesson: _lesson,
-                step: _lessonStep,
-                lessonIndex: _lessonIndex,
-                stepIndex: _stepIndex,
-                totalSteps: _totalSteps,
-                completedSteps: _completedSteps,
-                isLastStep: _isLastStep,
-                matched: _practiceMatched,
-                onBack: _previousLessonStep,
-                onNext: _nextLessonStep,
-                onExit: _exitGuided,
-              )
-            else if (_practice && _question != null)
-              _PracticePanel(
-                key: const Key('practice-panel'),
-                question: _question!,
-                answered: _answered,
-                attempts: _attempts,
-                correctAnswers: _correctAnswers,
-                streak: _streak,
-                bestStreak: _bestStreak,
-                onAnswer: _answerPractice,
-                onNext: _nextPracticeQuestion,
-                onReset: _resetPracticeScore,
-                onExit: _exitPractice,
-              )
-            else
-              _Controls(
-                key: const Key('controls'),
-                clef: _clef,
-                keySignature: _key,
-                display: widget.display,
-                scale: scale,
-                chord: chord,
-                chordScale: chordScale,
-                chordMode: _chordMode,
-                inversion: chord?.inversion ?? 0,
-                progression: _progression,
-                step: _step,
-                onPlay: () => _playSound(note, chord),
-                onClefChanged: (clef) => setState(() => _clef = clef),
-                onKeyChanged: (key) => setState(() => _key = key),
-                onScaleTypeChanged: (type) => setState(() => _scaleType = type),
-                onChordModeChanged: _setChordMode,
-                onInversionChanged: (value) =>
-                    setState(() => _inversion = value),
-                onProgressionChanged: (value) =>
-                    setState(() => _progression = value),
-                onDegreeSelected: _moveToDegree,
-                onStepChanged: _setStep,
-              ),
-          ],
         ),
       ),
     );
@@ -680,7 +728,7 @@ class _GuidedPanel extends StatelessWidget {
 
 /// The panel shown in practice mode. It replaces the manual controls with a
 /// name-the-note quiz: the staff hides the answer and the learner picks the
-/// name from four choices.
+/// name from five choices.
 class _PracticePanel extends StatelessWidget {
   const _PracticePanel({
     super.key,
@@ -782,8 +830,9 @@ class _PracticePanel extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
                 children: [
                   for (final choice in question.choices)
                     _answerButton(context, choice),
@@ -867,13 +916,11 @@ class _PracticePanel extends StatelessWidget {
         foregroundColor: foreground,
         disabledBackgroundColor: background,
         disabledForegroundColor: foreground,
-        minimumSize: const Size(56, 44),
-        padding: const EdgeInsets.symmetric(horizontal: 18),
+        minimumSize: const Size(76, 54),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
       ),
-      child: Text(
-        choice,
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ),
+      child: Text(choice),
     );
   }
 }
@@ -952,6 +999,42 @@ class _Controls extends StatelessWidget {
     ];
     final enharmonic = display.showEnharmonic ? note.enharmonicName : null;
 
+    // Tablets and desktop windows get a compact layout: the keyboard shares
+    // the readout row and the selectors wrap into one or two lines, leaving
+    // more of the screen for the staff.
+    final wide = MediaQuery.sizeOf(context).width >= 720;
+
+    final clefSelector = SegmentedButton<Clef>(
+      showSelectedIcon: false,
+      segments: [
+        for (final value in Clef.values)
+          ButtonSegment<Clef>(value: value, label: Text(value.label)),
+      ],
+      selected: {clef},
+      onSelectionChanged: (selection) => onClefChanged(selection.first),
+    );
+    final keySelector = _KeySelector(
+      value: keySignature,
+      onChanged: onKeyChanged,
+    );
+    final scaleSelector = _ScaleSelector(
+      value: scale?.type,
+      onChanged: onScaleTypeChanged,
+    );
+    final chordSelector = _ChordSelector(
+      value: chordMode,
+      onChanged: onChordModeChanged,
+    );
+    final inversionSelector = _InversionSelector(
+      value: inversion,
+      count: chordMode == ChordMode.sevenths ? 4 : 3,
+      onChanged: onInversionChanged,
+    );
+    final progressionSelector = _ProgressionSelector(
+      value: progression,
+      onChanged: onProgressionChanged,
+    );
+
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.72,
@@ -1007,7 +1090,11 @@ class _Controls extends StatelessWidget {
                         if (secondaryNames.isNotEmpty)
                           Row(
                             children: [
-                              for (var i = 0; i < secondaryNames.length; i++) ...[
+                              for (
+                                var i = 0;
+                                i < secondaryNames.length;
+                                i++
+                              ) ...[
                                 if (i > 0) const SizedBox(width: 12),
                                 Flexible(
                                   child: Text(
@@ -1097,71 +1184,75 @@ class _Controls extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (wide) ...[
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: PianoKeyboard(
+                        midi: note.midi,
+                        label: note.pitchName,
+                        highlightPitchClasses: scale?.pitchClasses,
+                        chordPitchClasses: chord?.pitchClassSet,
+                      ),
+                    ),
+                  ],
                 ],
               ),
               if (chordMode != ChordMode.off) ...[
                 const SizedBox(height: 12),
                 _ChordReadout(chord: chord, chordScale: chordScale),
               ],
-              const SizedBox(height: 12),
-              PianoKeyboard(
-                midi: note.midi,
-                label: note.pitchName,
-                highlightPitchClasses: scale?.pitchClasses,
-                chordPitchClasses: chord?.pitchClassSet,
-              ),
-              const SizedBox(height: 12),
-              SegmentedButton<Clef>(
-                showSelectedIcon: false,
-                segments: [
-                  for (final value in Clef.values)
-                    ButtonSegment<Clef>(value: value, label: Text(value.label)),
-                ],
-                selected: {clef},
-                onSelectionChanged: (selection) =>
-                    onClefChanged(selection.first),
-              ),
-              const SizedBox(height: 8),
-              _KeySelector(value: keySignature, onChanged: onKeyChanged),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ScaleSelector(
-                      value: scale?.type,
-                      onChanged: onScaleTypeChanged,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ChordSelector(
-                      value: chordMode,
-                      onChanged: onChordModeChanged,
-                    ),
-                  ),
-                ],
-              ),
-              if (chordMode != ChordMode.off) ...[
-                const SizedBox(height: 8),
-                _InversionSelector(
-                  value: inversion,
-                  count: chordMode == ChordMode.sevenths ? 4 : 3,
-                  onChanged: onInversionChanged,
+              if (!wide) ...[
+                const SizedBox(height: 12),
+                PianoKeyboard(
+                  midi: note.midi,
+                  label: note.pitchName,
+                  highlightPitchClasses: scale?.pitchClasses,
+                  chordPitchClasses: chord?.pitchClassSet,
                 ),
+              ],
+              const SizedBox(height: 12),
+              if (wide)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    clefSelector,
+                    SizedBox(width: 280, child: keySelector),
+                    SizedBox(width: 260, child: scaleSelector),
+                    SizedBox(width: 220, child: chordSelector),
+                    if (chordMode != ChordMode.off) inversionSelector,
+                    if (chordMode != ChordMode.off)
+                      SizedBox(width: 300, child: progressionSelector),
+                  ],
+                )
+              else ...[
+                clefSelector,
                 const SizedBox(height: 8),
-                _ProgressionSelector(
-                  value: progression,
-                  onChanged: onProgressionChanged,
+                keySelector,
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: scaleSelector),
+                    const SizedBox(width: 8),
+                    Expanded(child: chordSelector),
+                  ],
                 ),
-                if (progression != null) ...[
+                if (chordMode != ChordMode.off) ...[
                   const SizedBox(height: 8),
-                  _ProgressionChips(
-                    progression: progression!,
-                    scale: chordScale,
-                    seventh: chordMode == ChordMode.sevenths,
-                    onSelected: onDegreeSelected,
-                  ),
+                  inversionSelector,
+                  const SizedBox(height: 8),
+                  progressionSelector,
                 ],
+              ],
+              if (progression != null) ...[
+                const SizedBox(height: 8),
+                _ProgressionChips(
+                  progression: progression!,
+                  scale: chordScale,
+                  seventh: chordMode == ChordMode.sevenths,
+                  onSelected: onDegreeSelected,
+                ),
               ],
             ],
           ),
@@ -1218,7 +1309,7 @@ class _KeySelector extends StatelessWidget {
           children: [
             const Icon(Icons.piano, size: 18),
             const SizedBox(width: 10),
-            Expanded(
+            Flexible(
               child: Text(
                 'Key: ${value.label}',
                 key: const Key('key-label'),
@@ -1227,9 +1318,11 @@ class _KeySelector extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Flexible(
+            Expanded(
               child: Text(
                 value.signatureLabel,
+                textAlign: TextAlign.right,
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
