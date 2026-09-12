@@ -286,18 +286,27 @@ class _HomePageState extends State<HomePage> {
     return relative + 1;
   }
 
-  /// The diatonic chord built on [note]'s scale degree, or `null` when the
-  /// chord lab is off or [note] is not in [scale].
+  /// The chord built on [note] in [scale]: the diatonic chord when the note is
+  /// in the scale, and a chromatic transformation of it when the note lies
+  /// outside, so a transformed augmented or diminished shape still appears.
+  /// Returns `null` only when the chord lab is off.
   Chord? _chordFor(Scale scale, Note note) {
     if (_chordMode == ChordMode.off) return null;
     final override = _chordQuality;
     if (override != null) {
       return Chord.onNote(note, override, inversion: _inversion);
     }
-    if (!scale.pitchClasses.contains(note.midi % 12)) return null;
-    return Chord.diatonic(
+    if (scale.pitchClasses.contains(note.midi % 12)) {
+      return Chord.diatonic(
+        scale,
+        _degreeOf(note, scale),
+        extension: _chordMode.extension!,
+        inversion: _inversion,
+      );
+    }
+    return Chord.chromatic(
       scale,
-      _degreeOf(note, scale),
+      note,
       extension: _chordMode.extension!,
       inversion: _inversion,
     );
@@ -2074,6 +2083,9 @@ class _ChordReadout extends StatelessWidget {
         : chord.diatonic
         ? '${chord.romanNumeral}  ·  ${chord.quality.label}  ·  '
               '${chord.inversionLabel} in ${chordScale.label}'
+        : chord.chromatic
+        ? '${chord.romanNumeral}  ·  ${chord.quality.label}  ·  '
+              '${chord.inversionLabel}  ·  chromatic'
         : '${chord.quality.label}  ·  ${chord.inversionLabel}  ·  '
               'chosen chord';
     return Row(

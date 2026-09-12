@@ -288,6 +288,48 @@ void main() {
     );
   });
 
+  testWidgets('an out-of-scale note gets a transformed chord', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    // C\u266F major with a C\u266F harmonic minor highlight: E\u266F is in the key
+    // but outside the highlight, so its diatonic chord is transformed.
+    await tester.tap(find.byKey(const Key('key-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('C\u266F major').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('scale-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Harmonic minor').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Triads').last);
+    await tester.pumpAndSettle();
+
+    // The middle line reads B\u266F in C\u266F major; four steps down is E\u266F.
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byTooltip('Lower'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chord-symbol'))).data,
+      'E\u266Fm',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chord-caption'))).data,
+      contains('chromatic'),
+    );
+    expect(
+      tester
+          .widget<PianoKeyboard>(find.byType(PianoKeyboard))
+          .chordPitchClasses,
+      {5, 8, 0},
+    );
+  });
+
   testWidgets('changing inversion rotates the chord and names the bass', (
     tester,
   ) async {

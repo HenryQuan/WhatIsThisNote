@@ -409,8 +409,9 @@ class Chord {
     required this.rootLetter,
     required this.quality,
     required this.degree,
-    this.flatDegree = false,
+    this.degreeAccidental = '',
     this.diatonic = true,
+    this.chromatic = false,
     this.inversion = 0,
   });
 
@@ -459,7 +460,67 @@ class Chord {
       rootLetter: rootLetter,
       quality: quality,
       degree: degree,
-      flatDegree: degrees[d].label.startsWith('\u266D'),
+      degreeAccidental: degrees[d].label.startsWith('\u266D') ? '\u266D' : '',
+      inversion: inversion.clamp(0, quality.intervals.length - 1),
+    );
+  }
+
+  /// Builds the chord on a chromatic [root] that is not in [scale], keeping the
+  /// scale's letter-degrees in the upper voices.
+  ///
+  /// Displacing the root from its scale tone alters every stacked interval, so
+  /// a diatonic shape can come out transformed: lowering the root of a major
+  /// triad yields a diminished one, raising the root of a minor triad yields an
+  /// augmented one, and so on. This is the chord shown when the highlighted
+  /// note lies outside the selected scale.
+  factory Chord.chromatic(
+    Scale scale,
+    Note root, {
+    ChordExtension extension = ChordExtension.triad,
+    int inversion = 0,
+  }) {
+    assert(scale.isHeptatonic, 'Chords need a seven-note scale');
+    final degrees = scale.type.degrees;
+    var d = (root.letter.index - scale.tonicLetter.index) % 7;
+    if (d < 0) d += 7;
+
+    int scaleSemitone(int index) =>
+        degrees[index % 7].semitone + (index ~/ 7) * 12;
+
+    final scaleRoot = scaleSemitone(d);
+    final scaleRootPitchClass = (scale.tonicPitchClass + scaleRoot) % 12;
+    final rootPitchClass = root.midi % 12;
+    var offset = (rootPitchClass - scaleRootPitchClass) % 12;
+    if (offset > 6) offset -= 12;
+
+    // The accidental on the roman numeral, measured against the tonic's major
+    // scale so it reads the same in major and minor keys.
+    final majorDegree =
+        (scale.tonicPitchClass + ScaleType.major.degrees[d].semitone) % 12;
+    var difference = (rootPitchClass - majorDegree) % 12;
+    if (difference > 6) difference -= 12;
+    final accidental = difference < 0
+        ? '\u266D'
+        : difference > 0
+        ? '\u266F'
+        : '';
+
+    final scaleSteps = extension.scaleSteps;
+    final intervals = <int>[
+      for (var i = 0; i < scaleSteps.length; i++)
+        i == 0 ? 0 : scaleSemitone(d + scaleSteps[i]) - scaleRoot - offset,
+    ];
+    final quality = ChordQuality.fromStack(scaleSteps, intervals);
+
+    return Chord(
+      rootName: root.pitchName,
+      rootPitchClass: rootPitchClass,
+      rootLetter: root.letter,
+      quality: quality,
+      degree: d + 1,
+      degreeAccidental: accidental,
+      diatonic: false,
+      chromatic: true,
       inversion: inversion.clamp(0, quality.intervals.length - 1),
     );
   }
@@ -473,11 +534,16 @@ class Chord {
   final int degree;
 
   /// Whether the chord is the scale's diatonic chord, rather than a specific
-  /// chord picked from the readout.
+  /// chord picked from the readout or a chromatic transformation.
   final bool diatonic;
 
-  /// Whether the scale degree's label carries a flat (used by [romanNumeral]).
-  final bool flatDegree;
+  /// Whether the chord is a chromatic transformation of a scale chord: the
+  /// root lies outside the scale but the upper voices keep the scale's
+  /// letter-degrees (see [Chord.chromatic]).
+  final bool chromatic;
+
+  /// Accidental prefixed to the roman numeral's degree, e.g. `♭` or `♯`.
+  final String degreeAccidental;
 
   final int inversion;
 
@@ -518,7 +584,7 @@ class Chord {
   /// Roman numeral for the chord in its key, e.g. `V7`, `ii7` or `vii\u00B07`.
   String get romanNumeral {
     const numerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
-    final upper = (flatDegree ? '\u266D' : '') + numerals[(degree - 1) % 7];
+    final upper = '$degreeAccidental${numerals[(degree - 1) % 7]}';
     final numeral = quality.hasMinorThird ? upper.toLowerCase() : upper;
     return '$numeral${quality.romanSuffix}';
   }

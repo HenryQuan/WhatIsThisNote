@@ -477,6 +477,50 @@ void main() {
       expect(chord.pitchClasses, [5, 9, 0, 4, 7, 11, 2]);
     });
 
+    test(
+      'transforms a lowered root of a major key into an augmented chord',
+      () {
+        const cSharpMajor = Scale('C\u266F', 1, ScaleType.major);
+        // E natural is the lowered third of C\u266F major, so the diatonic
+        // E\u266F minor becomes E augmented.
+        final chord = Chord.chromatic(
+          cSharpMajor,
+          Note.fromLetter(NoteLetter.e, 4),
+        );
+        expect(chord.symbol, 'Eaug');
+        expect(chord.romanNumeral, '\u266DIII+');
+        expect(chord.diatonic, isFalse);
+        expect(chord.chromatic, isTrue);
+        expect(chord.pitchClasses, [4, 8, 0]);
+      },
+    );
+
+    test('transforms a raised root of a minor key into a diminished chord', () {
+      const aHarmonic = Scale('A', 9, ScaleType.harmonicMinor);
+      // E\u266F is the raised fifth of A harmonic minor, so the dominant E major
+      // becomes E\u266F diminished.
+      final chord = Chord.chromatic(
+        aHarmonic,
+        Note.fromLetter(NoteLetter.e, 4).withAccidental(Accidental.sharp),
+      );
+      expect(chord.symbol, 'E\u266Fdim');
+      expect(chord.romanNumeral, '\u266Fv\u00B0');
+      expect(chord.pitchClasses, [5, 8, 11]);
+    });
+
+    test('transforms a C\u266F major note outside C\u266F harmonic minor', () {
+      const cSharpHarmonic = Scale('C\u266F', 1, ScaleType.harmonicMinor);
+      // A\u266F is the key's sixth but not its harmonic-minor sixth (A), so the
+      // diatonic A major triad becomes A\u266F diminished.
+      final chord = Chord.chromatic(
+        cSharpHarmonic,
+        Note.fromLetter(NoteLetter.a, 4).withAccidental(Accidental.sharp),
+      );
+      expect(chord.symbol, 'A\u266Fdim');
+      expect(chord.romanNumeral, 'vi\u00B0');
+      expect(chord.pitchClasses, [10, 1, 4]);
+    });
+
     test('rotates and voices extended chords', () {
       final six = Chord.diatonic(cMajor, 1, extension: ChordExtension.sixth);
       expect(six.staffSteps(4), [4, 6, 8, 9]);
