@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/clef.dart';
+import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/note.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 
@@ -110,6 +112,101 @@ void main() {
     test('clamps steps to the draggable range', () {
       expect(geometry.clampStep(-100), kMinStaffStep);
       expect(geometry.clampStep(100), kMaxStaffStep);
+    });
+  });
+
+  group('Key', () {
+    final cMajor = kMajorKeys[0];
+    final gMajor = MusicalKey('G', KeyMode.major, 1);
+    final fMajor = MusicalKey('F', KeyMode.major, -1);
+    final eMinor = MusicalKey('E', KeyMode.minor, 1);
+
+    test('provides fifteen major and fifteen minor keys', () {
+      expect(kMajorKeys.length, 15);
+      expect(kMinorKeys.length, 15);
+      expect(kAllKeys.length, 30);
+    });
+
+    test('C major has no accidentals', () {
+      for (final letter in NoteLetter.values) {
+        expect(cMajor.accidentalFor(letter), Accidental.natural);
+      }
+      expect(cMajor.signatureLabel, 'no sharps or flats');
+    });
+
+    test('sharp keys alter letters in the order F C G D A E B', () {
+      expect(gMajor.accidentalFor(NoteLetter.f), Accidental.sharp);
+      expect(gMajor.accidentalFor(NoteLetter.c), Accidental.natural);
+      expect(gMajor.signatureLabel, '1 sharp');
+
+      final dMajor = MusicalKey('D', KeyMode.major, 2);
+      expect(dMajor.accidentalFor(NoteLetter.f), Accidental.sharp);
+      expect(dMajor.accidentalFor(NoteLetter.c), Accidental.sharp);
+      expect(dMajor.accidentalFor(NoteLetter.g), Accidental.natural);
+
+      final cSharpMajor = MusicalKey('C\u266F', KeyMode.major, 7);
+      for (final letter in NoteLetter.values) {
+        expect(cSharpMajor.accidentalFor(letter), Accidental.sharp);
+      }
+    });
+
+    test('flat keys alter letters in the order B E A D G C F', () {
+      expect(fMajor.accidentalFor(NoteLetter.b), Accidental.flat);
+      expect(fMajor.accidentalFor(NoteLetter.e), Accidental.natural);
+      expect(fMajor.signatureLabel, '1 flat');
+
+      final bFlatMajor = MusicalKey('B\u266D', KeyMode.major, -2);
+      expect(bFlatMajor.accidentalFor(NoteLetter.b), Accidental.flat);
+      expect(bFlatMajor.accidentalFor(NoteLetter.e), Accidental.flat);
+      expect(bFlatMajor.accidentalFor(NoteLetter.a), Accidental.natural);
+    });
+
+    test('minor keys use the same signatures as their relative major', () {
+      expect(eMinor.accidentalFor(NoteLetter.f), Accidental.sharp);
+      expect(eMinor.accidentalFor(NoteLetter.c), Accidental.natural);
+    });
+
+    test('applyTo names notes according to the key', () {
+      expect(gMajor.applyTo(Clef.treble.noteAt(8)).name, 'F\u266F5');
+      expect(fMajor.applyTo(Clef.treble.noteAt(8)).name, 'F5');
+      expect(gMajor.applyTo(Clef.treble.noteAt(0)).name, 'E4');
+      expect(gMajor.applyTo(Clef.bass.noteAt(6)).name, 'F\u266F3');
+    });
+
+    test('accidentals change the sounding pitch', () {
+      final fSharp = gMajor.applyTo(Clef.treble.noteAt(8));
+      expect(fSharp.midi, 78); // F#5
+      expect(fSharp.isNatural, isFalse);
+      expect(fSharp.withAccidental(Accidental.natural).midi, 77);
+    });
+
+    test('signature positions depend on the clef', () {
+      expect(gMajor.signatureFor(Clef.treble).single.step, 8);
+      expect(gMajor.signatureFor(Clef.bass).single.step, 6);
+      expect(gMajor.signatureFor(Clef.alto).single.step, 7);
+
+      expect(fMajor.signatureFor(Clef.treble).single.step, 4);
+      expect(fMajor.signatureFor(Clef.bass).single.step, 2);
+      expect(fMajor.signatureFor(Clef.alto).single.step, 3);
+    });
+
+    test('signatures grow in the standard order', () {
+      final dMajor = MusicalKey('D', KeyMode.major, 2);
+      final treble = dMajor.signatureFor(Clef.treble);
+      expect(treble.map((e) => e.accidental),
+          everyElement(Accidental.sharp));
+      expect(treble.map((e) => e.step), [8, 5]);
+
+      final bFlatMajor = MusicalKey('B\u266D', KeyMode.major, -2);
+      expect(
+        bFlatMajor.signatureFor(Clef.treble).map((e) => e.step),
+        [4, 7],
+      );
+    });
+
+    test('C major and A minor have empty signatures', () {
+      expect(cMajor.signatureFor(Clef.treble), isEmpty);
+      expect(kMinorKeys.first.signatureFor(Clef.bass), isEmpty);
     });
   });
 }

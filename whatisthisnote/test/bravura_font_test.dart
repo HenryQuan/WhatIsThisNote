@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/clef.dart';
 
 /// Renders a single music glyph at [baselineY] using the same placement logic
@@ -88,6 +89,20 @@ void main() {
     const fontSize = 40.0;
     const baselineY = 200;
     final ink = await _renderGlyph('\uE0A4', fontSize, baselineY);
+
+    final above = baselineY - ink.minY;
+    final below = ink.maxY - baselineY;
+    expect((above - below).abs(), lessThan(4));
+  });
+
+  test('a sharp is centred on its origin line', () async {
+    const fontSize = 40.0;
+    const baselineY = 200;
+    final ink = await _renderGlyph(
+      Accidental.sharp.glyph,
+      fontSize,
+      baselineY,
+    );
 
     final above = baselineY - ink.minY;
     final below = ink.maxY - baselineY;

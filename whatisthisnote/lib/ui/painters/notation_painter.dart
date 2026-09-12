@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../core/clef.dart';
+import '../../core/key.dart';
 import '../../core/staff_geometry.dart';
 import '../notation_glyphs.dart';
 
-/// Paints a five line staff, a clef, the ledger lines required by the current
-/// note and the note itself (with stem). Also paints a small label next to the
-/// note showing its scientific and solfege names.
+/// Paints a five line staff, a clef, the key signature, the ledger lines
+/// required by the current note and the note itself (with stem). Also paints a
+/// small label next to the note showing its scientific and solfege names.
 class NotationPainter extends CustomPainter {
   NotationPainter({
     required this.geometry,
     required this.clef,
+    required this.key,
     required this.step,
     required this.noteX,
     required this.lineColor,
@@ -21,6 +23,7 @@ class NotationPainter extends CustomPainter {
 
   final StaffGeometry geometry;
   final Clef clef;
+  final MusicalKey key;
 
   /// Continuous (possibly fractional) staff step of the note. Fractional
   /// values are used while dragging.
@@ -43,6 +46,7 @@ class NotationPainter extends CustomPainter {
 
     _paintStaff(canvas, linePaint);
     _paintClef(canvas);
+    _paintKeySignature(canvas);
     _paintLedgerLines(canvas, linePaint);
     _paintNote(canvas);
     if (showLabel) {
@@ -73,6 +77,27 @@ class NotationPainter extends CustomPainter {
       x: geometry.staffLeft + geometry.space * 0.15,
       baselineY: geometry.yForStep(clef.glyphStep),
     );
+  }
+
+  void _paintKeySignature(Canvas canvas) {
+    final items = key.signatureFor(clef);
+    if (items.isEmpty) return;
+    final spacing = geometry.space * 0.9;
+    var x = geometry.staffLeft + (clef.advance + 0.35) * geometry.space;
+    for (final item in items) {
+      final glyph = _layoutGlyph(
+        item.accidental.glyph,
+        geometry.space * 4,
+        lineColor,
+      );
+      _paintGlyph(
+        canvas,
+        glyph,
+        x: x,
+        baselineY: geometry.yForStep(item.step),
+      );
+      x += spacing;
+    }
   }
 
   void _paintLedgerLines(Canvas canvas, Paint paint) {
@@ -115,7 +140,7 @@ class NotationPainter extends CustomPainter {
   }
 
   void _paintLabel(Canvas canvas) {
-    final note = clef.noteAt(step.round());
+    final note = key.applyTo(clef.noteAt(step.round()));
     final painter = TextPainter(
       text: TextSpan(
         text: note.name,
@@ -176,6 +201,7 @@ class NotationPainter extends CustomPainter {
     return old.geometry.size != geometry.size ||
         old.geometry.space != geometry.space ||
         old.clef != clef ||
+        old.key != key ||
         old.step != step ||
         old.noteX != noteX ||
         old.lineColor != lineColor ||

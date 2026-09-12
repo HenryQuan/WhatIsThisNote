@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/clef.dart';
+import '../../core/key.dart';
 import '../../core/staff_geometry.dart';
 import '../painters/notation_painter.dart';
 
@@ -11,6 +12,7 @@ class StaffView extends StatefulWidget {
   const StaffView({
     super.key,
     required this.clef,
+    required this.keySignature,
     required this.step,
     required this.onStepChanged,
     this.minStep = -6,
@@ -18,6 +20,7 @@ class StaffView extends StatefulWidget {
   });
 
   final Clef clef;
+  final MusicalKey keySignature;
 
   /// The settled (integer) staff step.
   final int step;
@@ -117,8 +120,20 @@ class _StaffViewState extends State<StaffView>
     }
   }
 
+  /// Left-most x the note may occupy, leaving room for the clef and key
+  /// signature.
+  double _contentLeft(StaffGeometry geometry) {
+    final clefRight =
+        geometry.staffLeft + (0.15 + widget.clef.advance) * geometry.space;
+    final signatureWidth = widget.keySignature.signatureCount == 0
+        ? 0.0
+        : geometry.space * 0.2 +
+            widget.keySignature.signatureCount * geometry.space * 0.9;
+    return clefRight + signatureWidth + geometry.space * 0.9;
+  }
+
   double _clampNoteX(StaffGeometry geometry, double x) {
-    final lo = geometry.staffLeft + geometry.space * 2.6;
+    final lo = _contentLeft(geometry);
     final hi = geometry.staffRight - geometry.space * 0.6;
     if (lo >= hi) return geometry.size.width / 2;
     return x.clamp(lo, hi);
@@ -138,7 +153,7 @@ class _StaffViewState extends State<StaffView>
           Size(constraints.maxWidth, constraints.maxHeight),
         );
         if (_noteX < 0) {
-          _noteX = (geometry.staffLeft + geometry.staffRight) / 2;
+          _noteX = (_contentLeft(geometry) + geometry.staffRight) / 2;
         }
         _noteX = _clampNoteX(geometry, _noteX);
 
@@ -154,6 +169,7 @@ class _StaffViewState extends State<StaffView>
             painter: NotationPainter(
               geometry: geometry,
               clef: widget.clef,
+              key: widget.keySignature,
               step: _currentStep,
               noteX: _noteX,
               lineColor: scheme.onSurface.withValues(alpha: 0.85),

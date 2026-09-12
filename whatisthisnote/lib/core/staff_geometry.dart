@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 /// Lowest staff step the user can drag to (three ledger lines below).
@@ -24,7 +25,8 @@ class StaffGeometry {
   /// Builds responsive geometry: the line spacing scales with the available
   /// height but is clamped so the staff stays readable on any screen.
   factory StaffGeometry.forSize(Size size) {
-    final space = (size.height / 15).clamp(8.0, 40.0);
+    final space =
+        math.min(size.height / 15, size.width / 16).clamp(8.0, 40.0);
     final margin = (size.width * 0.06).clamp(12.0, 64.0);
     return StaffGeometry(
       size: size,

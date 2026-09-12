@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'accidental.dart';
+
 /// The seven diatonic note letters used in western music notation.
 enum NoteLetter {
   c('C', 'Do'),
@@ -28,14 +30,19 @@ enum NoteLetter {
 /// `C0 == 0`, `D0 == 1`, ... `B0 == 6`, `C1 == 7` and so on. Moving one
 /// diatonic step up the staff always increases the index by one, which makes
 /// staff math (ledger lines, transposing by a third, ...) trivial.
+///
+/// [accidental] alters the sounding pitch without changing the staff position,
+/// exactly like a sharp or flat in written music.
 class Note implements Comparable<Note> {
-  const Note(this.diatonicIndex);
+  const Note(this.diatonicIndex, [this.accidental = Accidental.natural]);
 
-  /// Creates a note from a letter and an octave, e.g. `Note.fromLetter(NoteLetter.e, 4)`.
+  /// Creates a natural note from a letter and an octave, e.g.
+  /// `Note.fromLetter(NoteLetter.e, 4)`.
   factory Note.fromLetter(NoteLetter letter, int octave) =>
       Note(octave * 7 + letter.index);
 
   final int diatonicIndex;
+  final Accidental accidental;
 
   /// The letter of this note.
   NoteLetter get letter => NoteLetter.values[diatonicIndex % 7];
@@ -43,30 +50,50 @@ class Note implements Comparable<Note> {
   /// The scientific octave number (C4 is middle C).
   int get octave => (diatonicIndex - (diatonicIndex % 7)) ~/ 7;
 
-  /// Scientific pitch name, e.g. `E4`.
-  String get name => '${letter.name}$octave';
+  /// Scientific pitch name, e.g. `E4` or `F♯5`.
+  String get name {
+    final suffix = accidental == Accidental.natural ? '' : accidental.text;
+    return '${letter.name}$suffix$octave';
+  }
 
-  /// Fixed-do solfege name, e.g. `Mi`.
-  String get solfege => letter.solfege;
+  /// Fixed-do solfege name, e.g. `Mi` or `Fa♯`.
+  String get solfege {
+    final suffix = accidental == Accidental.natural ? '' : accidental.text;
+    return '${letter.solfege}$suffix';
+  }
 
   /// MIDI note number using standard tuning (C4 == 60).
-  int get midi => (octave + 1) * 12 + letter.semitone;
+  int get midi => (octave + 1) * 12 + letter.semitone + accidental.offset;
 
   /// Frequency in hertz using A4 == 440 Hz.
   double get frequency => 440.0 * math.pow(2, (midi - 69) / 12).toDouble();
 
-  /// Returns a copy transposed by [steps] diatonic steps.
-  Note transpose(int steps) => Note(diatonicIndex + steps);
+  /// True when no accidental alters the letter.
+  bool get isNatural => accidental == Accidental.natural;
+
+  /// Returns a copy of this note with the given [accidental].
+  Note withAccidental(Accidental accidental) =>
+      Note(diatonicIndex, accidental);
+
+  /// Returns a copy transposed by [steps] diatonic steps, keeping the
+  /// accidental.
+  Note transpose(int steps) => Note(diatonicIndex + steps, accidental);
 
   @override
-  int compareTo(Note other) => diatonicIndex.compareTo(other.diatonicIndex);
+  int compareTo(Note other) {
+    final byPosition = diatonicIndex.compareTo(other.diatonicIndex);
+    if (byPosition != 0) return byPosition;
+    return accidental.offset.compareTo(other.accidental.offset);
+  }
 
   @override
   bool operator ==(Object other) =>
-      other is Note && other.diatonicIndex == diatonicIndex;
+      other is Note &&
+      other.diatonicIndex == diatonicIndex &&
+      other.accidental == accidental;
 
   @override
-  int get hashCode => diatonicIndex.hashCode;
+  int get hashCode => Object.hash(diatonicIndex, accidental);
 
   @override
   String toString() => name;

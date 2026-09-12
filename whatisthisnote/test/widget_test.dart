@@ -52,4 +52,30 @@ void main() {
       isNot('B4'),
     );
   });
+
+  testWidgets('selecting a key applies its signature to the note',
+      (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byKey(const Key('key-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('G major').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('key-label'))).data,
+      'Key: G major',
+    );
+
+    // Move up four steps from the middle line (B4) to the F line (F5).
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byTooltip('Higher'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      'F\u266F5',
+    );
+  });
 }

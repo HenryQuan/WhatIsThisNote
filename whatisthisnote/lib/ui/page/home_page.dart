@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../core/clef.dart';
+import '../../core/key.dart';
 import '../../core/staff_geometry.dart';
 import '../widgets/staff_view.dart';
 
-/// The main screen: an interactive staff plus controls for the clef, the note
-/// position and the theme.
+/// The main screen: an interactive staff plus controls for the clef, the key,
+/// the note position and the theme.
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
@@ -22,6 +23,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   Clef _clef = Clef.treble;
+  MusicalKey _key = kMajorKeys.first;
 
   /// Middle line of the treble staff (B4).
   int _step = 4;
@@ -73,6 +75,7 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: StaffView(
                 clef: _clef,
+                keySignature: _key,
                 step: _step,
                 onStepChanged: (step) {
                   if (step != _step) setState(() => _step = step);
@@ -81,8 +84,10 @@ class _HomePageState extends State<HomePage> {
             ),
             _Controls(
               clef: _clef,
+              keySignature: _key,
               step: _step,
               onClefChanged: (clef) => setState(() => _clef = clef),
+              onKeyChanged: (key) => setState(() => _key = key),
               onStepChanged: _setStep,
             ),
           ],
@@ -106,25 +111,30 @@ class _HomePageState extends State<HomePage> {
 class _Controls extends StatelessWidget {
   const _Controls({
     required this.clef,
+    required this.keySignature,
     required this.step,
     required this.onClefChanged,
+    required this.onKeyChanged,
     required this.onStepChanged,
   });
 
   final Clef clef;
+  final MusicalKey keySignature;
   final int step;
   final ValueChanged<Clef> onClefChanged;
+  final ValueChanged<MusicalKey> onKeyChanged;
   final ValueChanged<int> onStepChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final note = clef.noteAt(step);
+    final note = keySignature.applyTo(clef.noteAt(step));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -196,7 +206,90 @@ class _Controls extends StatelessWidget {
             selected: {clef},
             onSelectionChanged: (selection) => onClefChanged(selection.first),
           ),
+          const SizedBox(height: 8),
+          _KeySelector(value: keySignature, onChanged: onKeyChanged),
         ],
+      ),
+    );
+  }
+}
+
+class _KeySelector extends StatelessWidget {
+  const _KeySelector({required this.value, required this.onChanged});
+
+  final MusicalKey value;
+  final ValueChanged<MusicalKey> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PopupMenuButton<MusicalKey>(
+      tooltip: 'Key signature',
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        const PopupMenuItem<MusicalKey>(
+          enabled: false,
+          height: 34,
+          child: _MenuHeader('Major'),
+        ),
+        for (final key in kMajorKeys)
+          PopupMenuItem<MusicalKey>(value: key, child: Text(key.label)),
+        const PopupMenuDivider(),
+        const PopupMenuItem<MusicalKey>(
+          enabled: false,
+          height: 34,
+          child: _MenuHeader('Minor'),
+        ),
+        for (final key in kMinorKeys)
+          PopupMenuItem<MusicalKey>(value: key, child: Text(key.label)),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.piano, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Key: ${value.label}',
+                key: const Key('key-label'),
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              value.signatureLabel,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuHeader extends StatelessWidget {
+  const _MenuHeader(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      label.toUpperCase(),
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: theme.colorScheme.primary,
+        letterSpacing: 1.2,
+        fontWeight: FontWeight.bold,
       ),
     );
   }

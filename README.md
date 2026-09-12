@@ -13,6 +13,7 @@ lines.
 - [x] Drag or tap the note to change its pitch; it snaps to the nearest position
 - [x] Smooth snap animation
 - [x] Automatic ledger lines above and below the staff
+- [x] All 15 major and 15 minor key signatures, drawn on the staff
 - [x] Note names in scientific pitch (C, D, E...) and fixed-do solfege (Do, Re, Mi...)
 - [x] Treble, bass and alto clefs
 - [x] Responsive layout (line spacing scales with the screen)

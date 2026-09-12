@@ -54,4 +54,40 @@ enum Clef {
 
   /// The inverse of [noteAt]: the diatonic step above the bottom line.
   int stepOf(Note note) => note.diatonicIndex - bottomLine.diatonicIndex;
+
+  /// Horizontal advance of the clef glyph in staff spaces.
+  double get advance {
+    switch (this) {
+      case Clef.treble:
+        return 2.684;
+      case Clef.bass:
+        return 2.736;
+      case Clef.alto:
+        return 2.796;
+    }
+  }
+
+  /// Staff steps for the seven sharps in the order F C G D A E B.
+  List<int> get sharpSignatureSteps {
+    switch (this) {
+      case Clef.treble:
+        return const [8, 5, 9, 6, 3, 7, 4];
+      case Clef.bass:
+        return const [6, 3, 7, 4, 1, 5, 2];
+      case Clef.alto:
+        return const [7, 4, 8, 5, 2, 6, 3];
+    }
+  }
+
+  /// Staff steps for the seven flats in the order B E A D G C F.
+  List<int> get flatSignatureSteps {
+    switch (this) {
+      case Clef.treble:
+        return const [4, 7, 3, 6, 2, 5, 1];
+      case Clef.bass:
+        return const [2, 5, 1, 4, 0, 3, -1];
+      case Clef.alto:
+        return const [3, 6, 2, 5, 1, 4, 0];
+    }
+  }
 }
