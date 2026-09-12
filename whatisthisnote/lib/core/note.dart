@@ -82,6 +82,22 @@ class Note implements Comparable<Note> {
   /// True when no accidental alters the letter.
   bool get isNatural => accidental == Accidental.natural;
 
+  /// The other common spelling of this note, e.g. `G♭4` for `F♯4`, or `null`
+  /// for natural notes (and for the rare note with no single-accidental twin).
+  Note? get enharmonic {
+    if (accidental == Accidental.natural) return null;
+    final twinIndex =
+        diatonicIndex + (accidental == Accidental.sharp ? 1 : -1);
+    final naturalTwin = Note(twinIndex);
+    final difference = midi - naturalTwin.midi;
+    if (difference == 0) return naturalTwin;
+    if (difference.abs() != 1) return null;
+    return Note(twinIndex, difference > 0 ? Accidental.sharp : Accidental.flat);
+  }
+
+  /// Full enharmonic spelling, e.g. `G♭4`, or `null` for natural notes.
+  String? get enharmonicName => enharmonic?.name;
+
   /// Returns a copy of this note with the given [accidental].
   Note withAccidental(Accidental accidental) =>
       Note(diatonicIndex, accidental);

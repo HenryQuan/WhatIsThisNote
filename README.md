@@ -18,6 +18,9 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 - [x] All 15 major and 15 minor key signatures, drawn on the staff
 - [x] Note names in scientific pitch (C, D, E...) and fixed-do solfege (Do, Re, Mi...)
 - [x] Numbered notation (jianpu) degree next to the name, 1 = Do ... 7 = Ti
+- [x] Display preferences: pick the naming system (scientific, solfege or
+      numbered), toggle the on-staff name label and show the enharmonic twin
+      (F♯ ~ G♭)
 - [x] Mini piano keyboard showing which key the note is on
 - [x] Hear the note, or the current chord, with a built-in synthesizer (no audio assets)
 - [x] Treble, bass and alto clefs

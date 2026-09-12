@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/clef.dart';
+import '../../core/display_preferences.dart';
 import '../../core/key.dart';
 import '../../core/staff_geometry.dart';
 import '../notation_glyphs.dart';
@@ -23,6 +24,8 @@ class NotationPainter extends CustomPainter {
     required this.labelColor,
     required this.labelBackgroundColor,
     required this.showLabel,
+    this.naming = NamingSystem.scientific,
+    this.showEnharmonic = false,
     this.chordSteps = const [],
     this.chordColor = const Color(0xFF000000),
     this.targetStep,
@@ -46,6 +49,11 @@ class NotationPainter extends CustomPainter {
   final Color labelBackgroundColor;
   final bool showLabel;
 
+  /// Which naming system the label uses, plus whether the enharmonic spelling
+  /// is appended.
+  final NamingSystem naming;
+  final bool showEnharmonic;
+
   /// Staff steps of the current chord, low to high. Empty for a single note.
   final List<int> chordSteps;
 
@@ -62,8 +70,27 @@ class NotationPainter extends CustomPainter {
   /// chord is shown, otherwise the written note.
   int get labelStep => chordSteps.isEmpty ? step.round() : chordSteps.first;
 
-  /// Name shown by the label next to the note (or the chord bass).
-  String get labelNoteName => key.applyTo(clef.noteAt(labelStep)).pitchName;
+  /// Name shown by the label next to the note (or the chord bass), using the
+  /// selected naming system.
+  String get labelNoteName {
+    final note = key.applyTo(clef.noteAt(labelStep));
+    switch (naming) {
+      case NamingSystem.scientific:
+        return note.pitchName;
+      case NamingSystem.solfege:
+        return note.solfege;
+      case NamingSystem.jianpu:
+        return key.jianpuFor(note);
+    }
+  }
+
+  /// Full text drawn in the label: the name, plus the enharmonic spelling when
+  /// that preference is on.
+  String get labelText {
+    final note = key.applyTo(clef.noteAt(labelStep));
+    final twin = showEnharmonic ? note.enharmonic?.pitchName : null;
+    return twin == null ? labelNoteName : '$labelNoteName/$twin';
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -230,10 +257,9 @@ class NotationPainter extends CustomPainter {
   }
 
   void _paintLabel(Canvas canvas) {
-    final note = key.applyTo(clef.noteAt(labelStep));
     final painter = TextPainter(
       text: TextSpan(
-        text: note.pitchName,
+        text: labelText,
         style: TextStyle(
           color: labelColor,
           fontSize: geometry.space * 0.95,

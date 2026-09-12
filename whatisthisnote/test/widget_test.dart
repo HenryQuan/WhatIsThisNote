@@ -489,6 +489,67 @@ void main() {
     expect(frequencies[0], lessThan(frequencies[1]));
     expect(frequencies[1], lessThan(frequencies[2]));
   });
+
+  testWidgets('display settings switch the naming system', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Solfege'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'Si');
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-pitch'))).data,
+      'B4',
+    );
+    final painter = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((custom) => custom.painter)
+        .whereType<NotationPainter>()
+        .single;
+    expect(painter.labelNoteName, 'Si');
+  });
+
+  testWidgets('display settings hide the on-staff note name', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isTrue);
+
+    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('toggle-staff-label')));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isFalse);
+  });
+
+  testWidgets('enharmonic equivalent shows the twin spelling', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byKey(const Key('key-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('G major').last);
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 4; i++) {
+      await tester.tap(find.byTooltip('Higher'));
+      await tester.pumpAndSettle();
+    }
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      'F\u266F5',
+    );
+    expect(find.byKey(const Key('note-enharmonic')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('toggle-enharmonic')));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-enharmonic'))).data,
+      '\u2248 G\u266D5',
+    );
+  });
 }
 
 class _RecordingNotePlayer implements NotePlayer {

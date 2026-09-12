@@ -1,6 +1,7 @@
 import 'accidental.dart';
 import 'clef.dart';
 import 'note.dart';
+import 'scale.dart';
 
 /// Whether a key is major or minor.
 enum KeyMode { major, minor }
@@ -101,6 +102,33 @@ class MusicalKey {
 
   /// Applies this key signature to a written [note].
   Note applyTo(Note note) => note.withAccidental(accidentalFor(note.letter));
+
+  /// Numbered-notation (jianpu) label for a written [note] in this key.
+  ///
+  /// The key's major or natural minor scale is used, so its tonic is `1`.
+  /// Notes outside the key get a `♯` or `♭` prefix, e.g. `4♯` for F♯ in C.
+  String jianpuFor(Note note) {
+    final scale = Scale(
+      tonic,
+      tonicPitchClass,
+      mode == KeyMode.major ? ScaleType.major : ScaleType.naturalMinor,
+    );
+    final inScale = scale.degreeLabelFor(note.midi);
+    if (inScale != null) return inScale;
+
+    var relative = (note.letter.index - tonicLetter.index) % 7;
+    if (relative < 0) relative += 7;
+    final expected =
+        (tonicPitchClass + scale.type.degrees[relative].semitone) % 12;
+    var difference = (((note.midi % 12) - expected) % 12 + 12) % 12;
+    if (difference > 6) difference -= 12;
+    final degree = relative + 1;
+    if (difference == 0) return '$degree';
+    final accidental = difference > 0
+        ? Accidental.sharp.text
+        : Accidental.flat.text;
+    return '$degree$accidental';
+  }
 
   /// The accidentals to draw on [clef]'s staff, in order.
   List<SignatureAccidental> signatureFor(Clef clef) {

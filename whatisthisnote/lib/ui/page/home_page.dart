@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import '../../audio/note_player.dart';
 import '../../core/chord.dart';
 import '../../core/clef.dart';
+import '../../core/display_preferences.dart';
 import '../../core/key.dart';
 import '../../core/lesson.dart';
 import '../../core/note.dart';
 import '../../core/quiz.dart';
 import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
+import '../widgets/display_settings_sheet.dart';
 import '../widgets/piano_keyboard.dart';
 import '../widgets/staff_view.dart';
 
@@ -19,11 +21,15 @@ class HomePage extends StatefulWidget {
     super.key,
     required this.themeMode,
     required this.onThemeModeChanged,
+    required this.display,
+    required this.onDisplayChanged,
     this.notePlayer,
   });
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+  final DisplayPreferences display;
+  final ValueChanged<DisplayPreferences> onDisplayChanged;
 
   /// Overrides the audio player, used by tests to avoid the native plugin.
   final NotePlayer? notePlayer;
@@ -86,6 +92,18 @@ class _HomePageState extends State<HomePage> {
               _key.applyTo(_clef.noteAt(step)).frequency,
           ];
     _notePlayer.play(frequencies);
+  }
+
+  void _openDisplaySettings() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => DisplaySettingsSheet(
+        preferences: widget.display,
+        onChanged: widget.onDisplayChanged,
+      ),
+    );
   }
 
   Scale? get _selectedScale => _scaleType == null
@@ -289,7 +307,11 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('What is this note?'),
+        title: const Text(
+          'What is this note?',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           IconButton(
             tooltip: 'Practice',
@@ -302,6 +324,12 @@ class _HomePageState extends State<HomePage> {
             isSelected: _guided,
             icon: const Icon(Icons.school),
             onPressed: _guided ? _exitGuided : _startGuided,
+          ),
+          IconButton(
+            key: const Key('display-settings'),
+            tooltip: 'Display',
+            icon: const Icon(Icons.tune),
+            onPressed: _openDisplaySettings,
           ),
           PopupMenuButton<ThemeMode>(
             tooltip: 'Theme',
@@ -338,8 +366,12 @@ class _HomePageState extends State<HomePage> {
                 step: _step,
                 chordSteps: chord?.staffSteps(_step) ?? const [],
                 targetStep: _guidedTarget,
-                showLabel: !_practice || _answered != null,
+                showLabel:
+                    widget.display.showStaffLabel &&
+                    (!_practice || _answered != null),
                 interactive: !_practice,
+                naming: widget.display.naming,
+                showEnharmonic: widget.display.showEnharmonic,
                 onStepChanged: (step) {
                   if (step != _step) setState(() => _step = step);
                 },
@@ -379,6 +411,7 @@ class _HomePageState extends State<HomePage> {
                 key: const Key('controls'),
                 clef: _clef,
                 keySignature: _key,
+                display: widget.display,
                 scale: scale,
                 chord: chord,
                 chordScale: chordScale,
@@ -760,6 +793,7 @@ class _Controls extends StatelessWidget {
     super.key,
     required this.clef,
     required this.keySignature,
+    required this.display,
     required this.scale,
     required this.chord,
     required this.chordScale,
@@ -780,6 +814,7 @@ class _Controls extends StatelessWidget {
 
   final Clef clef;
   final MusicalKey keySignature;
+  final DisplayPreferences display;
   final Scale? scale;
   final Chord? chord;
   final Scale chordScale;
@@ -812,6 +847,21 @@ class _Controls extends StatelessWidget {
         : theme.colorScheme.onSurfaceVariant;
     final badgeLabel = scale == null ? '${note.degree}' : (scaleDegree ?? '–');
 
+    final primaryName = switch (display.naming) {
+      NamingSystem.scientific => note.name,
+      NamingSystem.solfege => note.solfege,
+      NamingSystem.jianpu => keySignature.jianpuFor(note),
+    };
+    final secondaryNames = <(Key, String)>[
+      if (display.naming != NamingSystem.scientific)
+        (const Key('note-pitch'), note.name),
+      if (display.naming != NamingSystem.solfege)
+        (const Key('note-solfege'), note.solfege),
+      if (display.naming != NamingSystem.jianpu)
+        (const Key('note-jianpu'), keySignature.jianpuFor(note)),
+    ];
+    final enharmonic = display.showEnharmonic ? note.enharmonicName : null;
+
     return ConstrainedBox(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.sizeOf(context).height * 0.72,
@@ -833,24 +883,51 @@ class _Controls extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.baseline,
                           textBaseline: TextBaseline.alphabetic,
                           children: [
-                            Text(
-                              note.name,
-                              key: const Key('note-name'),
-                              style: theme.textTheme.displaySmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
+                            Flexible(
+                              child: Text(
+                                primaryName,
+                                key: const Key('note-name'),
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.displaySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              note.solfege,
-                              key: const Key('note-solfege'),
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                            if (enharmonic != null) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  '\u2248 $enharmonic',
+                                  key: const Key('note-enharmonic'),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
+                        if (secondaryNames.isNotEmpty)
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 2,
+                            children: [
+                              for (final (key, name) in secondaryNames)
+                                Text(
+                                  name,
+                                  key: key,
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                            ],
+                          ),
                         Text(
                           '${clef.label} clef  ·  drag the note or tap the staff',
                           style: theme.textTheme.bodySmall?.copyWith(

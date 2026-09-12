@@ -559,4 +559,71 @@ void main() {
       expect(differs, isTrue);
     });
   });
+
+  group('Enharmonic', () {
+    test('names the twin spelling of an accidental note', () {
+      expect(
+        Note.fromLetter(
+          NoteLetter.f,
+          4,
+        ).withAccidental(Accidental.sharp).enharmonicName,
+        'G\u266D4',
+      );
+      expect(
+        Note.fromLetter(
+          NoteLetter.g,
+          4,
+        ).withAccidental(Accidental.flat).enharmonicName,
+        'F\u266F4',
+      );
+      // B♯ and C♭ cross an octave boundary.
+      expect(
+        Note.fromLetter(
+          NoteLetter.b,
+          4,
+        ).withAccidental(Accidental.sharp).enharmonicName,
+        'C5',
+      );
+      expect(
+        Note.fromLetter(
+          NoteLetter.c,
+          5,
+        ).withAccidental(Accidental.flat).enharmonicName,
+        'B4',
+      );
+    });
+
+    test('has no twin for natural notes', () {
+      expect(Note.fromLetter(NoteLetter.c, 4).enharmonicName, isNull);
+    });
+  });
+
+  group('Jianpu', () {
+    const cKey = MusicalKey('C', KeyMode.major, 0);
+    const gKey = MusicalKey('G', KeyMode.major, 1);
+    const aKey = MusicalKey('A', KeyMode.minor, 0);
+
+    test('numbers the key-relative scale degrees', () {
+      expect(cKey.jianpuFor(Note.fromLetter(NoteLetter.c, 4)), '1');
+      expect(cKey.jianpuFor(Note.fromLetter(NoteLetter.b, 4)), '7');
+      expect(gKey.jianpuFor(Note.fromLetter(NoteLetter.g, 4)), '1');
+      expect(
+        gKey.jianpuFor(
+          Note.fromLetter(NoteLetter.f, 5).withAccidental(Accidental.sharp),
+        ),
+        '7',
+      );
+      expect(aKey.jianpuFor(Note.fromLetter(NoteLetter.a, 4)), '1');
+      expect(aKey.jianpuFor(Note.fromLetter(NoteLetter.c, 5)), '\u266D3');
+    });
+
+    test('marks chromatic notes with an accidental', () {
+      expect(
+        cKey.jianpuFor(
+          Note.fromLetter(NoteLetter.f, 4).withAccidental(Accidental.sharp),
+        ),
+        '4\u266F',
+      );
+    });
+  });
 }

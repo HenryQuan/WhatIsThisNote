@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/clef.dart';
+import '../../core/display_preferences.dart';
 import '../../core/key.dart';
 import '../../core/staff_geometry.dart';
 import '../painters/notation_painter.dart';
@@ -21,6 +22,8 @@ class StaffView extends StatefulWidget {
     this.maxStep = 14,
     this.showLabel = true,
     this.interactive = true,
+    this.naming = NamingSystem.scientific,
+    this.showEnharmonic = false,
   });
 
   final Clef clef;
@@ -48,6 +51,11 @@ class StaffView extends StatefulWidget {
 
   /// Whether the note can be dragged or the staff tapped.
   final bool interactive;
+
+  /// Which naming system the on-staff label uses, and whether to show the
+  /// enharmonic spelling next to it.
+  final NamingSystem naming;
+  final bool showEnharmonic;
 
   @override
   State<StaffView> createState() => _StaffViewState();
@@ -189,6 +197,8 @@ class _StaffViewState extends State<StaffView>
             labelColor: scheme.primary,
             labelBackgroundColor: scheme.surface,
             showLabel: widget.showLabel,
+            naming: widget.naming,
+            showEnharmonic: widget.showEnharmonic,
             chordSteps: widget.chordSteps,
             chordColor: scheme.tertiary,
             targetStep: widget.targetStep,
