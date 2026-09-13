@@ -30,18 +30,22 @@ class AudioNotePlayer implements NotePlayer {
 
   final AudioPlayer _player = AudioPlayer();
 
+  /// The newest play request. Rapid taps start several stop/play calls at
+  /// once; the older ones bail out after their stop so they cannot start a
+  /// second tone on top of the newest (which is the buzz heard on iOS and
+  /// Android). The last request always wins.
+  int _request = 0;
+
   @override
   Future<void> play(Iterable<double> frequencies, {Duration? duration}) async {
     final voices = frequencies.toList(growable: false);
     if (voices.isEmpty) return;
     try {
+      final request = ++_request;
+      final wav = toneWav(voices, duration: duration ?? _defaultDuration);
       await _player.stop();
-      await _player.play(
-        BytesSource(
-          toneWav(voices, duration: duration ?? _defaultDuration),
-          mimeType: 'audio/wav',
-        ),
-      );
+      if (request != _request) return;
+      await _player.play(BytesSource(wav, mimeType: 'audio/wav'));
     } catch (error) {
       // Audio is a nice-to-have; never let a platform hiccup break the app.
       debugPrint('Could not play tone: $error');
@@ -49,5 +53,8 @@ class AudioNotePlayer implements NotePlayer {
   }
 
   @override
-  Future<void> dispose() => _player.dispose();
+  Future<void> dispose() {
+    _request++;
+    return _player.dispose();
+  }
 }

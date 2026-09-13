@@ -6,8 +6,9 @@ import 'dart:typed_data';
 ///
 /// This is pure Dart, so the same sound is generated on every platform and
 /// can be unit tested without an audio plugin. A soft attack, an exponential
-/// decay and a short tail keep the tone click-free, and a quiet second
-/// harmonic gives it a little body.
+/// decay and a short tail keep the tone click-free. Mid and high notes are a
+/// fundamental with a quiet octave; low notes add overtones so they stay
+/// audible on the small speakers phones use, without brightening the rest.
 Uint8List toneWav(
   List<double> frequencies, {
   Duration duration = const Duration(milliseconds: 700),
@@ -33,6 +34,11 @@ Uint8List toneWav(
     final peak = amplitude / voices.length;
     final attack = (sampleRate * 0.008).round().clamp(1, sampleCount);
     final release = (sampleRate * 0.02).round().clamp(1, sampleCount);
+    // Precompute each voice's partials once so the sample loop only sums
+    // sines, and normalise each voice so the mix still respects [peak].
+    final voicePartials = [
+      for (final frequency in voices) _partialsFor(frequency, sampleRate),
+    ];
     for (var i = 0; i < sampleCount; i++) {
       final t = i / sampleRate;
       final progress = i / sampleCount;
@@ -44,10 +50,10 @@ Uint8List toneWav(
           attackGain * releaseGain * math.exp(-2.5 * progress);
 
       var value = 0.0;
-      for (final frequency in voices) {
-        value +=
-            math.sin(2 * math.pi * frequency * t) +
-            0.25 * math.sin(4 * math.pi * frequency * t);
+      for (final partials in voicePartials) {
+        for (final (frequency, gain) in partials) {
+          value += gain * math.sin(2 * math.pi * frequency * t);
+        }
       }
       final scaled = (value * peak * envelope * 32767).round();
       samples[i] = scaled < -32768
@@ -59,6 +65,55 @@ Uint8List toneWav(
   }
 
   return _wavBytes(samples, sampleRate);
+}
+
+/// Middle C's frequency, in hertz. Notes at or above it keep the original warm
+/// tone; notes below it gain overtones so a phone speaker can still voice them.
+const double _middleCHz = 261.6256;
+
+/// The most overtones one low voice is given, however low it is.
+const int _maxHarmonics = 16;
+
+/// The `(frequency, gain)` partials that make up one voice.
+///
+/// The original tone is a fundamental plus a quiet octave, and it is kept
+/// exactly for C4 and above. As a note drops below C4 it crossfades to a soft
+/// sawtooth with more overtones: a bass fundamental is below what a phone
+/// speaker reproduces, but its overtones are not. The crossfade keeps the
+/// change gradual, and harmonics never reach Nyquist.
+List<(double, double)> _partialsFor(double frequency, int sampleRate) {
+  final nyquist = sampleRate / 2;
+  final richness = (math.log(_middleCHz / frequency) / math.ln2).clamp(0.0, 1.0);
+  if (richness == 0) {
+    return [
+      for (final (harmonic, gain) in const [(1, 1.0), (2, 0.25)])
+        if (frequency * harmonic < nyquist)
+          (frequency * harmonic, gain),
+    ];
+  }
+
+  final count = math.min(_maxHarmonics, 2 + (richness * 14).round());
+  final saw = <double>[];
+  var sawSum = 0.0;
+  for (var harmonic = 1; harmonic <= count; harmonic++) {
+    if (frequency * harmonic >= nyquist) break;
+    final gain = 1 / harmonic;
+    saw.add(gain);
+    sawSum += gain;
+  }
+  if (sawSum == 0) return const [];
+
+  return [
+    for (var i = 0; i < saw.length; i++)
+      (
+        frequency * (i + 1),
+        switch (i) {
+          0 => (1 - richness) + (saw[i] / sawSum) * richness,
+          1 => 0.25 * (1 - richness) + (saw[i] / sawSum) * richness,
+          _ => (saw[i] / sawSum) * richness,
+        },
+      ),
+  ];
 }
 
 /// Wraps [samples] in a standard little-endian WAV container.

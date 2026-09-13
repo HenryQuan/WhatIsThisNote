@@ -125,17 +125,21 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Plays whatever is currently shown, including the chord-lab voicing.
-  void _playCurrent({Duration? duration}) {
+  Future<void> _playCurrent({Duration? duration}) {
     final scale = _selectedScale;
     final note = _key.applyTo(_clef.noteAt(_step));
-    _playSound(note, _chordFor(_chordScale(scale), note), duration: duration);
+    return _playSound(
+      note,
+      _chordFor(_chordScale(scale), note),
+      duration: duration,
+    );
   }
 
   /// Plays the current note/chord and cancels any running sequence, used by
   /// the play button and the space shortcut.
   void _playNow() {
     _stopSequence();
-    _playCurrent();
+    unawaited(_playCurrent());
   }
 
   /// Whether the keyboard focus is on a button, so space/arrows should keep
@@ -180,8 +184,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Plays the written [note], or [chord]'s tones when the chord lab is on.
-  void _playSound(Note note, Chord? chord, {Duration? duration}) {
-    _notePlayer.play(_frequenciesFor(note, chord), duration: duration);
+  Future<void> _playSound(Note note, Chord? chord, {Duration? duration}) {
+    return _notePlayer.play(_frequenciesFor(note, chord), duration: duration);
   }
 
   /// Stops any automatic playback and clears its highlight.
@@ -211,7 +215,7 @@ class _HomePageState extends State<HomePage> {
       _playback = kind;
       _playbackIndex = 0;
     });
-    _playSequenceStep(token, kind, 0);
+    unawaited(_playSequenceStep(token, kind, 0));
   }
 
   /// How many steps [kind] plays. A scale gets one extra note so it ends on
@@ -227,7 +231,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Plays one step of the running sequence and schedules the next.
-  void _playSequenceStep(int token, _Playback kind, int index) {
+  ///
+  /// The step's tone is awaited before the next one is scheduled. Starting the
+  /// next tone stops the current one, and on iOS starting a tone takes a moment
+  /// (the bytes are written to a file and prepared), so overlapping starts used
+  /// to cancel every note but the last. Waiting keeps each note sounding.
+  Future<void> _playSequenceStep(int token, _Playback kind, int index) async {
     if (!mounted || token != _playbackToken) return;
     if (index >= _sequenceLength(kind)) {
       _stopSequence();
@@ -238,17 +247,18 @@ class _HomePageState extends State<HomePage> {
     if (kind == _Playback.highlight) {
       final scale = _selectedScale!;
       final octave = _key.applyTo(_clef.noteAt(_step)).octave;
-      _notePlayer.play(<double>[
+      await _notePlayer.play(<double>[
         scale.frequencies(octave: octave, includeOctave: true)[index],
       ], duration: _sequenceNoteDuration);
     } else {
       _jumpToDegree(_progression!.degrees[index]);
-      _playCurrent(duration: _sequenceNoteDuration);
+      await _playCurrent(duration: _sequenceNoteDuration);
     }
 
+    if (!mounted || token != _playbackToken) return;
     _playbackTimer = Timer(
       _sequenceStepGap,
-      () => _playSequenceStep(token, kind, index + 1),
+      () => unawaited(_playSequenceStep(token, kind, index + 1)),
     );
   }
 
