@@ -32,21 +32,18 @@ void main() {
 
     await tester.tap(find.byTooltip('Metronome'));
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('coming-soon-title')))
-          .data,
-      'Metronome',
-    );
+    expect(find.byKey(const Key('metronome-toggle')), findsOneWidget);
+    expect(find.byKey(const Key('register-readout')), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Chords'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<Text>(find.byKey(const Key('coming-soon-title')))
-          .data,
-      'Chords',
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
     );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('builder-add')), findsOneWidget);
+    expect(find.textContaining('Add at least two notes'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Note'));
     await tester.pumpAndSettle();
@@ -61,6 +58,133 @@ void main() {
 
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('the metronome tempo can be changed', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(find.byTooltip('Metronome'));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<Text>(find.byKey(const Key('bpm-value'))).data, '90');
+    await tester.tap(find.byKey(const Key('bpm-up')));
+    await tester.pump();
+    expect(tester.widget<Text>(find.byKey(const Key('bpm-value'))).data, '91');
+    await tester.tap(find.byKey(const Key('bpm-down')));
+    await tester.pump();
+    expect(tester.widget<Text>(find.byKey(const Key('bpm-value'))).data, '90');
+  });
+
+  testWidgets('the metronome click starts and stops', (tester) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(find.byTooltip('Metronome'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('metronome-toggle')));
+    await tester.pump();
+    expect(player.played, hasLength(1));
+
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(player.played.length, greaterThan(1));
+
+    await tester.tap(find.byKey(const Key('metronome-toggle')));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the register finder plays the selected pitch', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(find.byTooltip('Metronome'));
+    await tester.pumpAndSettle();
+
+    // The finder opens on C4.
+    await tester.tap(find.byKey(const Key('register-play')));
+    await tester.pump();
+    expect(player.played.single.single, closeTo(261.6256, 0.01));
+
+    await tester.tap(find.byKey(const Key('register-zone-5')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('register-play')));
+    await tester.pump();
+    expect(player.played.last.single, closeTo(523.2511, 0.01));
+  });
+
+  testWidgets('the chord builder names the notes it is given', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The add button stacks a third at a time: D, F, A.
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.byKey(const Key('builder-add')));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dm'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('builder-count'))).data,
+      '3 of 8 notes',
+    );
+  });
+
+  testWidgets('the chord builder suggests the closest chord', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // D and F alone spell no triad; Dm is one A away.
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byKey(const Key('builder-add')));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dm'), findsOneWidget);
+    expect(find.text('add A'), findsOneWidget);
+  });
+
+  testWidgets('the chord builder plays the notes the learner stacked', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byKey(const Key('builder-add')));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('builder-play')));
+    await tester.pump();
+
+    expect(player.played, hasLength(1));
+    expect(player.played.single, hasLength(2));
   });
 
   testWidgets('shows a piano keyboard for the current note', (tester) async {

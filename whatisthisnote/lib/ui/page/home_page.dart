@@ -4,16 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../audio/note_player.dart';
+import '../../core/accidental.dart';
 import '../../core/chord.dart';
+import '../../core/chord_finder.dart';
 import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
 import '../../core/lesson.dart';
+import '../../core/metronome.dart';
 import '../../core/note.dart';
 import '../../core/quiz.dart';
 import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
+import '../widgets/chord_builder_panel.dart';
 import '../widgets/display_settings_sheet.dart';
+import '../widgets/metronome_panel.dart';
 import '../widgets/piano_keyboard.dart';
 import '../widgets/staff_view.dart';
 
@@ -29,6 +34,9 @@ const Duration _sequenceStepGap = Duration(milliseconds: 420);
 /// Window width at or above which the destinations move to a left rail; below
 /// it they are a bottom bar, so phones keep their width for the staff.
 const double _navRailBreakpoint = 900;
+
+/// Most notes the custom chord builder lets the learner stack.
+const int _maxBuilderNotes = 8;
 
 /// Top-level destinations of the app.
 enum _HomeTab { note, practice, metronome, chords }
@@ -120,6 +128,27 @@ class _HomePageState extends State<HomePage> {
   /// Width of the wide-layout controls rail, dragged by the user.
   double _sidebarWidth = 380;
 
+  /// Metronome tempo (beats per minute), whether the click is running and the
+  /// beat currently sounding.
+  int _bpm = 90;
+  bool _metronomeOn = false;
+  int _beat = 0;
+  Timer? _metronomeTimer;
+
+  /// Register finder selection (a pitch class and an octave) plus its looping
+  /// and sweeping playback.
+  int _registerPitchClass = 0;
+  int _registerZone = 4;
+  bool _registerLooping = false;
+  bool _registerSweeping = false;
+  Timer? _registerTimer;
+  int _registerToken = 0;
+
+  /// The custom chord being built, in the order notes were added, and which
+  /// note is selected (also the suggested root).
+  final List<Note> _builderNotes = [];
+  int? _builderSelected;
+
   /// The sequence currently playing automatically, if any, and which note of
   /// it is sounding. [_playbackToken] invalidates in-flight timer callbacks
   /// when a sequence is stopped or replaced.
@@ -146,6 +175,8 @@ class _HomePageState extends State<HomePage> {
     _keyboardFocus.dispose();
     _playbackTimer?.cancel();
     _playbackToken++;
+    _metronomeTimer?.cancel();
+    _registerTimer?.cancel();
     _ownedPlayer?.dispose();
     super.dispose();
   }
@@ -437,6 +468,8 @@ class _HomePageState extends State<HomePage> {
   void _selectTab(_HomeTab tab) {
     if (tab == _tab) return;
     if (_playback != null) _stopSequence();
+    _stopMetronome();
+    _stopRegister();
     final startPractice = tab == _HomeTab.practice && !_practice && !_guided;
     setState(() {
       _tab = tab;
@@ -557,6 +590,240 @@ class _HomePageState extends State<HomePage> {
       }
     });
     _applyLessonStep();
+  }
+
+  /// Starts or stops the metronome click. Register playback is stopped first so
+  /// the two never fight over the single audio player.
+  void _toggleMetronome() {
+    if (_metronomeOn) {
+      _stopMetronome();
+      return;
+    }
+    _stopRegister();
+    _stopSequence();
+    setState(() {
+      _metronomeOn = true;
+      _beat = -1;
+    });
+    _advanceBeat();
+  }
+
+  void _advanceBeat() {
+    if (!_metronomeOn) return;
+    setState(() => _beat = (_beat + 1) % 4);
+    // The downbeat is higher so it is easy to pick out of the pulse.
+    unawaited(
+      _notePlayer.play(
+        [_beat == 0 ? 1318.51 : 880.0],
+        duration: const Duration(milliseconds: 50),
+      ),
+    );
+    _metronomeTimer = Timer(beatInterval(_bpm), _advanceBeat);
+  }
+
+  void _stopMetronome() {
+    _metronomeTimer?.cancel();
+    _metronomeTimer = null;
+    if (_metronomeOn || _beat != 0) {
+      setState(() {
+        _metronomeOn = false;
+        _beat = 0;
+      });
+    }
+  }
+
+  void _setBpm(int bpm) {
+    final clamped = bpm.clamp(kMinBpm, kMaxBpm);
+    if (clamped == _bpm) return;
+    setState(() => _bpm = clamped);
+    if (_metronomeOn) {
+      _metronomeTimer?.cancel();
+      _metronomeTimer = Timer(beatInterval(_bpm), _advanceBeat);
+    }
+  }
+
+  /// Plays the register finder's current note once.
+  void _playRegisterNote() {
+    _stopSequence();
+    _stopRegister();
+    unawaited(
+      _notePlayer.play([
+        frequencyForPitchClass(_registerPitchClass, _registerZone),
+      ]),
+    );
+  }
+
+  /// Holds the register note, sounding it over and over until stopped.
+  void _toggleRegisterLoop() {
+    if (_registerLooping) {
+      _stopRegister();
+      return;
+    }
+    _stopMetronome();
+    _stopSequence();
+    _stopRegister();
+    final token = ++_registerToken;
+    setState(() {
+      _registerLooping = true;
+      _registerSweeping = false;
+    });
+    _loopRegister(token);
+  }
+
+  void _loopRegister(int token) {
+    if (token != _registerToken) return;
+    unawaited(
+      _notePlayer.play([
+        frequencyForPitchClass(_registerPitchClass, _registerZone),
+      ]),
+    );
+    _registerTimer = Timer(
+      const Duration(milliseconds: 700),
+      () => _loopRegister(token),
+    );
+  }
+
+  /// Walks C1 up to C8, moving the zone selection with each note.
+  void _sweepRegister() {
+    if (_registerSweeping) {
+      _stopRegister();
+      return;
+    }
+    _stopMetronome();
+    _stopSequence();
+    _stopRegister();
+    final token = ++_registerToken;
+    setState(() => _registerSweeping = true);
+    _sweepStep(token, kMinZone);
+  }
+
+  void _sweepStep(int token, int zone) {
+    if (token != _registerToken) return;
+    setState(() {
+      _registerZone = zone;
+      _registerPitchClass = 0;
+    });
+    unawaited(_notePlayer.play([frequencyForPitchClass(0, zone)]));
+    final done = zone >= kMaxZone;
+    _registerTimer = Timer(const Duration(milliseconds: 500), () {
+      if (token != _registerToken) return;
+      if (done) {
+        _stopRegister();
+      } else {
+        _sweepStep(token, zone + 1);
+      }
+    });
+  }
+
+  void _stopRegister() {
+    _registerTimer?.cancel();
+    _registerTimer = null;
+    _registerToken++;
+    if (_registerLooping || _registerSweeping) {
+      setState(() {
+        _registerLooping = false;
+        _registerSweeping = false;
+      });
+    }
+  }
+
+  /// Adds a note at [step] to the custom chord and selects it, so a new note is
+  /// also the suggested root.
+  void _addBuilderNote(int step) {
+    if (_builderNotes.length >= _maxBuilderNotes) return;
+    final note = _key.applyTo(_clef.noteAt(step));
+    setState(() {
+      _builderNotes.add(note);
+      _builderSelected = _builderNotes.length - 1;
+    });
+  }
+
+  /// Adds the next note a third above the top of the stack, for a precise way
+  /// in without tapping the staff.
+  void _addBuilderNoteAbove() {
+    var topStep = 4;
+    for (final note in _builderNotes) {
+      final step = _clef.stepOf(note);
+      if (step > topStep) topStep = step;
+    }
+    _addBuilderNote(topStep + 2);
+  }
+
+  void _moveBuilderNote(int index, int step) {
+    if (index < 0 || index >= _builderNotes.length) return;
+    final note = _builderNotes[index];
+    setState(() {
+      _builderNotes[index] = Note(
+        _clef.bottomLine.diatonicIndex + step,
+        note.accidental,
+      );
+    });
+  }
+
+  void _setBuilderAccidental(int index, Accidental accidental) {
+    if (index < 0 || index >= _builderNotes.length) return;
+    setState(() {
+      _builderNotes[index] = _builderNotes[index].withAccidental(accidental);
+    });
+  }
+
+  void _removeBuilderNote(int index) {
+    if (index < 0 || index >= _builderNotes.length) return;
+    setState(() {
+      _builderNotes.removeAt(index);
+      final selected = _builderSelected;
+      if (_builderNotes.isEmpty) {
+        _builderSelected = null;
+      } else if (selected != null) {
+        if (selected > index) _builderSelected = selected - 1;
+        if (_builderSelected! >= _builderNotes.length) {
+          _builderSelected = _builderNotes.length - 1;
+        }
+      }
+    });
+  }
+
+  /// Every chord the built notes could spell across all twelve roots, with the
+  /// selected note's root first.
+  List<ChordMatch> _builderMatches() {
+    final selected = _builderSelected;
+    return findChordMatches([
+      for (final note in _builderNotes) note.midi % 12,
+    ], preferredRoot: selected != null && selected < _builderNotes.length
+        ? _builderNotes[selected].midi % 12
+        : null);
+  }
+
+  /// Spells a root pitch class, preferring a note the learner placed and
+  /// falling back to a sharp spelling.
+  Note _builderRootNote(int pitchClass) {
+    for (final note in _builderNotes) {
+      if (note.midi % 12 == pitchClass) return note;
+    }
+    for (final letter in NoteLetter.values) {
+      final difference = ((pitchClass - letter.semitone) % 12 + 12) % 12;
+      if (difference == 0) return Note(letter.index);
+      if (difference == 1) return Note(letter.index, Accidental.sharp);
+    }
+    return Note(NoteLetter.c.index);
+  }
+
+  void _playBuilderChord() {
+    _stopSequence();
+    unawaited(
+      _notePlayer.play([for (final note in _builderNotes) note.frequency]),
+    );
+  }
+
+  void _playBuilderMatch(ChordMatch match) {
+    _stopSequence();
+    final rootMidi = midiForPitchClass(match.rootPitchClass, 4);
+    unawaited(
+      _notePlayer.play([
+        for (final interval in match.quality.intervals)
+          frequencyForMidi(rootMidi + interval),
+      ]),
+    );
   }
 
   @override
@@ -728,23 +995,69 @@ class _HomePageState extends State<HomePage> {
                         onReset: _resetPracticeScore,
                         onExit: _exitPractice,
                       ),
-                _HomeTab.metronome => const _ComingSoon(
-                    icon: Icons.av_timer,
-                    title: 'Metronome',
-                    message:
-                        'A metronome that also locates the register: hold a '
-                        'fixed note, or sweep C1 to C8 to feel the zones, then '
-                        'walk the notes to name the pitch. Fill it in with any '
-                        'scale.',
+                _HomeTab.metronome => MetronomePanel(
+                    bpm: _bpm,
+                    onBpmChanged: _setBpm,
+                    playing: _metronomeOn,
+                    beat: _beat,
+                    beatsPerBar: 4,
+                    onToggle: _toggleMetronome,
+                    pitchClass: _registerPitchClass,
+                    onPitchClassChanged: (pitchClass) {
+                      _stopRegister();
+                      setState(() => _registerPitchClass = pitchClass);
+                    },
+                    zone: _registerZone,
+                    onZoneChanged: (zone) {
+                      _stopRegister();
+                      setState(() => _registerZone = zone);
+                    },
+                    looping: _registerLooping,
+                    sweeping: _registerSweeping,
+                    onPlayNote: _playRegisterNote,
+                    onToggleLoop: _toggleRegisterLoop,
+                    onSweep: _sweepRegister,
+                    scale: scale,
+                    keySelector: _KeySelector(
+                      value: _key,
+                      onChanged: (key) {
+                        _stopRegister();
+                        setState(() => _key = key);
+                      },
+                    ),
+                    scaleSelector: _ScaleSelector(
+                      value: _scaleType,
+                      onChanged: (type) {
+                        _stopRegister();
+                        setState(() => _scaleType = type);
+                      },
+                    ),
                   ),
-                _HomeTab.chords => const _ComingSoon(
-                    icon: Icons.queue_music,
-                    title: 'Chords',
-                    message:
-                        'Stack up to eight notes and hear every chord they '
-                        'could make, with the closest match when they make '
-                        'none. Place a note, adjust it, then decide what the '
-                        'sound is.',
+                _HomeTab.chords => ChordBuilderPanel(
+                    notes: _builderNotes,
+                    selectedIndex: _builderSelected,
+                    clef: _clef,
+                    keySignature: _key,
+                    matches: _builderMatches(),
+                    maxNotes: _maxBuilderNotes,
+                    rootNoteFor: _builderRootNote,
+                    onSelectNote: (index) =>
+                        setState(() => _builderSelected = index),
+                    onAddNote: _addBuilderNote,
+                    onMoveNote: _moveBuilderNote,
+                    onAccidentalChanged: _setBuilderAccidental,
+                    onRemoveNote: _removeBuilderNote,
+                    onShowSuggestions: _addBuilderNoteAbove,
+                    onPlayChord: _playBuilderChord,
+                    onPlayMatch: _playBuilderMatch,
+                    keySelector: _KeySelector(
+                      value: _key,
+                      onChanged: (key) => setState(() => _key = key),
+                    ),
+                    scaleSelector: _ScaleSelector(
+                      value: _scaleType,
+                      onChanged: (type) => setState(() => _scaleType = type),
+                    ),
                   ),
               };
 
@@ -2349,54 +2662,4 @@ class _ThemeOption extends StatelessWidget {
   }
 }
 
-/// A placeholder for a top-level destination whose feature is still to come.
-class _ComingSoon extends StatelessWidget {
-  const _ComingSoon({
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
 
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 64, color: scheme.primary),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                key: const Key('coming-soon-title'),
-                style: theme.textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Chip(
-                avatar: Icon(Icons.construction, size: 18),
-                label: Text('Coming soon'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
