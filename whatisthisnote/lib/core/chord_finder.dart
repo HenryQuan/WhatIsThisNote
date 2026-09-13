@@ -44,9 +44,10 @@ class ChordMatch {
 /// [pitchClasses] could spell.
 ///
 /// Exact matches are returned first; when none is exact the closest shapes are
-/// returned instead, annotated with the notes they add or omit. Results whose
-/// root is [preferredRoot] (the learner's selected note) sort first, then by
-/// distance, then by the simplest shape.
+/// always returned instead, annotated with the notes they add or omit, so the
+/// list is never empty for two or more notes. Within the same distance, shapes
+/// whose root is [preferredRoot] (the learner's selected note) sort first, then
+/// the simplest shape.
 List<ChordMatch> findChordMatches(
   Iterable<int> pitchClasses, {
   int? preferredRoot,
@@ -63,8 +64,6 @@ List<ChordMatch> findChordMatches(
       };
       final missing = chordSet.difference(input).toList()..sort();
       final extra = input.difference(chordSet).toList()..sort();
-      // A shape more than two notes away is noise, not a suggestion.
-      if (missing.length + extra.length > 2) continue;
       matches.add(
         ChordMatch(
           rootPitchClass: root,
@@ -77,13 +76,18 @@ List<ChordMatch> findChordMatches(
   }
 
   matches.sort((a, b) {
+    if (a.distance != b.distance) return a.distance - b.distance;
     final preferredA = a.rootPitchClass == preferredRoot ? 0 : 1;
     final preferredB = b.rootPitchClass == preferredRoot ? 0 : 1;
     if (preferredA != preferredB) return preferredA - preferredB;
-    if (a.distance != b.distance) return a.distance - b.distance;
     if (a.quality.toneCount != b.quality.toneCount) {
       return a.quality.toneCount - b.quality.toneCount;
     }
+    // Break remaining ties by the shape's place in [kChordQualities], so the
+    // common triads stay ahead of altered spellings of the same notes.
+    final rankA = kChordQualities.indexOf(a.quality);
+    final rankB = kChordQualities.indexOf(b.quality);
+    if (rankA != rankB) return rankA - rankB;
     return a.rootPitchClass - b.rootPitchClass;
   });
 

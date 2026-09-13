@@ -21,9 +21,11 @@ class ChordBuilderPainter extends CustomPainter {
     required this.key,
     required this.notes,
     required this.selectedIndex,
+    required this.highlightPitchClasses,
     required this.lineColor,
     required this.noteColor,
     required this.selectedColor,
+    required this.highlightColor,
     required this.accidentalColor,
   });
 
@@ -32,9 +34,13 @@ class ChordBuilderPainter extends CustomPainter {
   final MusicalKey key;
   final List<Note> notes;
   final int? selectedIndex;
+
+  /// Pitch classes of the selected chord, ringed so the chosen shape is visible.
+  final Set<int> highlightPitchClasses;
   final Color lineColor;
   final Color noteColor;
   final Color selectedColor;
+  final Color highlightColor;
   final Color accidentalColor;
 
   @override
@@ -123,6 +129,17 @@ class ChordBuilderPainter extends CustomPainter {
         selected ? selectedColor : noteColor,
       );
       paintMusicGlyph(canvas, notehead, centerX: x, baselineY: y);
+
+      if (highlightPitchClasses.contains(note.midi % 12)) {
+        canvas.drawCircle(
+          Offset(x, y),
+          geometry.space * 0.9,
+          Paint()
+            ..color = highlightColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = geometry.space * 0.13,
+        );
+      }
     }
   }
 

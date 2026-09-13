@@ -160,6 +160,9 @@ class _HomePageState extends State<HomePage> {
   final List<Note> _builderNotes = [];
   int? _builderSelected;
 
+  /// The suggested chord the learner tapped, highlighted on the staff.
+  ChordMatch? _builderMatch;
+
   /// The sequence currently playing automatically, if any, and which note of
   /// it is sounding. [_playbackToken] invalidates in-flight timer callbacks
   /// when a sequence is stopped or replaced.
@@ -797,6 +800,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _builderNotes.add(note);
       _builderSelected = _builderNotes.length - 1;
+      _builderMatch = null;
     });
   }
 
@@ -811,6 +815,28 @@ class _HomePageState extends State<HomePage> {
     _addBuilderNote(topStep + 2);
   }
 
+  /// Adds the next note a third below the bottom of the stack, so a chord can
+  /// be built downward without tapping a precise staff row.
+  void _addBuilderNoteBelow() {
+    var bottomStep = 4;
+    if (_builderNotes.isNotEmpty) {
+      bottomStep = _clef.stepOf(_builderNotes.first);
+      for (final note in _builderNotes) {
+        final step = _clef.stepOf(note);
+        if (step < bottomStep) bottomStep = step;
+      }
+    }
+    _addBuilderNote(bottomStep - 2);
+  }
+
+  /// Nudges the selected note by [delta] staff steps, a tap-only alternative
+  /// to dragging on a small screen.
+  void _nudgeBuilderNote(int delta) {
+    final index = _builderSelected;
+    if (index == null || index >= _builderNotes.length) return;
+    _moveBuilderNote(index, _clef.stepOf(_builderNotes[index]) + delta);
+  }
+
   void _moveBuilderNote(int index, int step) {
     if (index < 0 || index >= _builderNotes.length) return;
     final note = _builderNotes[index];
@@ -819,6 +845,7 @@ class _HomePageState extends State<HomePage> {
         _clef.bottomLine.diatonicIndex + step,
         note.accidental,
       );
+      _builderMatch = null;
     });
   }
 
@@ -826,6 +853,7 @@ class _HomePageState extends State<HomePage> {
     if (index < 0 || index >= _builderNotes.length) return;
     setState(() {
       _builderNotes[index] = _builderNotes[index].withAccidental(accidental);
+      _builderMatch = null;
     });
   }
 
@@ -833,6 +861,7 @@ class _HomePageState extends State<HomePage> {
     if (index < 0 || index >= _builderNotes.length) return;
     setState(() {
       _builderNotes.removeAt(index);
+      _builderMatch = null;
       final selected = _builderSelected;
       if (_builderNotes.isEmpty) {
         _builderSelected = null;
@@ -846,14 +875,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Every chord the built notes could spell across all twelve roots, with the
-  /// selected note's root first.
+  /// lowest note on the staff (the bass) as the suggested root, so a
+  /// symmetrical shape is named in root position first.
   List<ChordMatch> _builderMatches() {
-    final selected = _builderSelected;
     return findChordMatches([
       for (final note in _builderNotes) note.midi % 12,
-    ], preferredRoot: selected != null && selected < _builderNotes.length
-        ? _builderNotes[selected].midi % 12
-        : null);
+    ], preferredRoot: _builderBassPitchClass());
+  }
+
+  /// Pitch class of the lowest note on the chord staff, or `null` when empty.
+  int? _builderBassPitchClass() {
+    if (_builderNotes.isEmpty) return null;
+    var lowest = _builderNotes.first;
+    for (final note in _builderNotes) {
+      if (note.midi < lowest.midi) lowest = note;
+    }
+    return lowest.midi % 12;
   }
 
   /// Spells a root pitch class, preferring a note the learner placed and
@@ -875,6 +912,16 @@ class _HomePageState extends State<HomePage> {
     unawaited(
       _notePlayer.play([for (final note in _builderNotes) note.frequency]),
     );
+  }
+
+  void _selectBuilderMatch(ChordMatch match) {
+    setState(() {
+      _builderMatch = _builderMatch == null ||
+              _builderMatch!.rootPitchClass != match.rootPitchClass ||
+              _builderMatch!.quality != match.quality
+          ? match
+          : null;
+    });
   }
 
   void _playBuilderMatch(ChordMatch match) {
@@ -1087,6 +1134,7 @@ class _HomePageState extends State<HomePage> {
                     clef: _clef,
                     keySignature: _key,
                     matches: _builderMatches(),
+                    selectedMatch: _builderMatch,
                     maxNotes: _maxBuilderNotes,
                     rootNoteFor: _builderRootNote,
                     onSelectNote: (index) =>
@@ -1096,15 +1144,14 @@ class _HomePageState extends State<HomePage> {
                     onAccidentalChanged: _setBuilderAccidental,
                     onRemoveNote: _removeBuilderNote,
                     onShowSuggestions: _addBuilderNoteAbove,
+                    onAddBelow: _addBuilderNoteBelow,
+                    onNudgeSelected: _nudgeBuilderNote,
                     onPlayChord: _playBuilderChord,
                     onPlayMatch: _playBuilderMatch,
+                    onSelectMatch: _selectBuilderMatch,
                     keySelector: _KeySelector(
                       value: _key,
                       onChanged: (key) => setState(() => _key = key),
-                    ),
-                    scaleSelector: _ScaleSelector(
-                      value: _scaleType,
-                      onChanged: (type) => setState(() => _scaleType = type),
                     ),
                   ),
               };

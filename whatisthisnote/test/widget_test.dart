@@ -254,15 +254,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // D and F alone spell no triad; Dm is one A away.
+    // D and F alone spell no triad; Dm is missing only its 5th.
     for (var i = 0; i < 2; i++) {
       await tester.tap(find.byKey(const Key('builder-add')));
       await tester.pump();
     }
     await tester.pumpAndSettle();
 
-    expect(find.text('Dm'), findsOneWidget);
-    expect(find.text('add A'), findsOneWidget);
+    expect(find.text('Dm(no5)'), findsOneWidget);
+    expect(find.textContaining('Missing: A (5th)'), findsWidgets);
   });
 
   testWidgets('the chord builder plays the notes the learner stacked', (
