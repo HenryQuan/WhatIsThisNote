@@ -690,6 +690,8 @@ void main() {
       await tester.ensureVisible(find.byKey(const Key('progression-label')));
       await tester.tap(find.byKey(const Key('progression-label')));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(name).last);
+      await tester.pumpAndSettle();
       await tester.tap(find.text(name).last);
       await tester.pumpAndSettle();
     }
@@ -763,6 +765,8 @@ void main() {
     Future<void> choose(String name) async {
       await tester.tap(find.byKey(const Key('progression-label')));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(name).last);
+      await tester.pumpAndSettle();
       await tester.tap(find.text(name).last);
       await tester.pumpAndSettle();
     }
@@ -833,7 +837,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Practice'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Guided path'));
+    await tester.tap(find.text('Guide'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('guided-panel')), findsOneWidget);
@@ -859,7 +863,7 @@ void main() {
     await tester.pumpWidget(const WhatIsThisNoteApp());
     await tester.tap(find.byTooltip('Practice'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Guided path'));
+    await tester.tap(find.text('Guide'));
     await tester.pumpAndSettle();
 
     // Three explanation steps, then the first practice step.

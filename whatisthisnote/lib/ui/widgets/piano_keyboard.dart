@@ -17,6 +17,8 @@ class PianoKeyboard extends StatelessWidget {
     this.playingPitchClass,
     this.playingUpperOctave = false,
     this.height = 54,
+    this.showHighlight = true,
+    this.onPitchClassTap,
   });
 
   /// MIDI number of the note to highlight (C4 == 60).
@@ -42,44 +44,70 @@ class PianoKeyboard extends StatelessWidget {
 
   final double height;
 
+  /// Whether [midi]'s key is highlighted. Turned off for read-and-play, where
+  /// highlighting the answer would give it away.
+  final bool showHighlight;
+
+  /// Called with the pitch class of the key the learner taps, making the
+  /// keyboard an input device. `null` leaves it a read-only display.
+  final ValueChanged<int>? onPitchClassTap;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final keyboard = CustomPaint(
+      size: Size.infinite,
+      painter: _PianoKeyboardPainter(
+        midi: midi,
+        label: label,
+        showHighlight: showHighlight,
+        highlightPitchClasses: highlightPitchClasses,
+        chordPitchClasses: chordPitchClasses,
+        playingPitchClass: playingPitchClass,
+        playingUpperOctave: playingUpperOctave,
+        whiteColor: scheme.surfaceContainerLowest,
+        blackColor: scheme.onSurface,
+        borderColor: scheme.outlineVariant,
+        highlightColor: scheme.primary,
+        scaleColor: scheme.primaryContainer,
+        chordColor: scheme.tertiary,
+        playingColor: scheme.secondary,
+        onHighlightColor: scheme.onPrimary,
+        highlightBlackColor: Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.78),
+          scheme.onSurface,
+        ),
+        scaleBlackColor: Color.alphaBlend(
+          scheme.primaryContainer.withValues(alpha: 0.78),
+          scheme.onSurface,
+        ),
+        chordBlackColor: Color.alphaBlend(
+          scheme.tertiary.withValues(alpha: 0.78),
+          scheme.onSurface,
+        ),
+        playingBlackColor: Color.alphaBlend(
+          scheme.secondary.withValues(alpha: 0.78),
+          scheme.onSurface,
+        ),
+      ),
+    );
+    if (onPitchClassTap == null) {
+      return SizedBox(height: height, child: keyboard);
+    }
     return SizedBox(
       height: height,
-      child: CustomPaint(
-        size: Size.infinite,
-        painter: _PianoKeyboardPainter(
-          midi: midi,
-          label: label,
-          highlightPitchClasses: highlightPitchClasses,
-          chordPitchClasses: chordPitchClasses,
-          playingPitchClass: playingPitchClass,
-          playingUpperOctave: playingUpperOctave,
-          whiteColor: scheme.surfaceContainerLowest,
-          blackColor: scheme.onSurface,
-          borderColor: scheme.outlineVariant,
-          highlightColor: scheme.primary,
-          scaleColor: scheme.primaryContainer,
-          chordColor: scheme.tertiary,
-          playingColor: scheme.secondary,
-          onHighlightColor: scheme.onPrimary,
-          highlightBlackColor: Color.alphaBlend(
-            scheme.primary.withValues(alpha: 0.78),
-            scheme.onSurface,
-          ),
-          scaleBlackColor: Color.alphaBlend(
-            scheme.primaryContainer.withValues(alpha: 0.78),
-            scheme.onSurface,
-          ),
-          chordBlackColor: Color.alphaBlend(
-            scheme.tertiary.withValues(alpha: 0.78),
-            scheme.onSurface,
-          ),
-          playingBlackColor: Color.alphaBlend(
-            scheme.secondary.withValues(alpha: 0.78),
-            scheme.onSurface,
-          ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (details) {
+            onPitchClassTap!(
+              _PianoKeyboardPainter.pitchClassAt(
+                details.localPosition,
+                Size(constraints.maxWidth, constraints.maxHeight),
+              ),
+            );
+          },
+          child: keyboard,
         ),
       ),
     );
@@ -90,6 +118,7 @@ class _PianoKeyboardPainter extends CustomPainter {
   _PianoKeyboardPainter({
     required this.midi,
     required this.label,
+    required this.showHighlight,
     required this.highlightPitchClasses,
     required this.chordPitchClasses,
     required this.playingPitchClass,
@@ -110,6 +139,7 @@ class _PianoKeyboardPainter extends CustomPainter {
 
   final int midi;
   final String? label;
+  final bool showHighlight;
   final Set<int>? highlightPitchClasses;
   final Set<int>? chordPitchClasses;
   final int? playingPitchClass;
@@ -151,6 +181,27 @@ class _PianoKeyboardPainter extends CustomPainter {
   /// Pitch class of each of the eight white keys (C to the next C).
   static const List<int> _whitePitchClasses = [0, 2, 4, 5, 7, 9, 11, 0];
 
+  /// Pitch class of the key under [point] in a keyboard of [size], using the
+  /// same layout as [paint]. Black keys take precedence where they overlap a
+  /// white key.
+  static int pitchClassAt(Offset point, Size size) {
+    const whiteCount = 8;
+    final whiteWidth = size.width / whiteCount;
+    final blackWidth = whiteWidth * 0.62;
+    final blackHeight = size.height * 0.62;
+    if (point.dy <= blackHeight) {
+      for (final entry in _blackAfterWhite.entries) {
+        final center = (entry.value + 1) * whiteWidth;
+        if (point.dx >= center - blackWidth / 2 &&
+            point.dx <= center + blackWidth / 2) {
+          return entry.key;
+        }
+      }
+    }
+    final index = (point.dx / whiteWidth).floor().clamp(0, whiteCount - 1);
+    return _whitePitchClasses[index];
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     const whiteCount = 8; // C D E F G A B C
@@ -177,7 +228,8 @@ class _PianoKeyboardPainter extends CustomPainter {
         size.height,
       ).deflate(0.5);
       final whitePitchClass = _whitePitchClasses[i];
-      final highlighted = !isBlack && i == whiteIndexOfHighlight;
+      final highlighted =
+          showHighlight && !isBlack && i == whiteIndexOfHighlight;
       final tinted = highlightPitchClasses?.contains(whitePitchClass) ?? false;
       final inChord = chordPitchClasses?.contains(whitePitchClass) ?? false;
       final playing =
@@ -210,7 +262,7 @@ class _PianoKeyboardPainter extends CustomPainter {
         width: blackWidth,
         height: blackHeight,
       );
-      final highlighted = isBlack && entry.key == pitchClass;
+      final highlighted = showHighlight && isBlack && entry.key == pitchClass;
       final tinted = highlightPitchClasses?.contains(entry.key) ?? false;
       final inChord = chordPitchClasses?.contains(entry.key) ?? false;
       final playing = playingPitchClass == entry.key;
@@ -259,6 +311,7 @@ class _PianoKeyboardPainter extends CustomPainter {
   bool shouldRepaint(covariant _PianoKeyboardPainter old) {
     return old.midi != midi ||
         old.label != label ||
+        old.showHighlight != showHighlight ||
         !setEquals(old.highlightPitchClasses, highlightPitchClasses) ||
         !setEquals(old.chordPitchClasses, chordPitchClasses) ||
         old.playingPitchClass != playingPitchClass ||

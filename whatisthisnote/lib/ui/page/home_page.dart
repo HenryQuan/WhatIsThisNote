@@ -11,6 +11,7 @@ import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
 import '../../core/lesson.dart';
+import '../../core/melody.dart';
 import '../../core/metronome.dart';
 import '../../core/note.dart';
 import '../../core/quiz.dart';
@@ -24,6 +25,9 @@ import '../widgets/staff_view.dart';
 
 /// The two kinds of note sequence that can be played automatically.
 enum _Playback { highlight, progression }
+
+/// The activities inside the Practice tab.
+enum _PracticeActivity { quiz, guided, read }
 
 /// How long each note of a sequence rings, and how long to wait before the
 /// next one starts. The gap is a little longer than the sound so the notes
@@ -123,6 +127,15 @@ class _HomePageState extends State<HomePage> {
   int _streak = 0;
   int _bestStreak = 0;
 
+  /// Optional read-and-play mode (a random phrase played back on the
+  /// keyboard), off by default.
+  bool _read = false;
+  MelodyBuilder? _melodyBuilder;
+  Melody? _melody;
+  int _melodyIndex = 0;
+  bool _melodyMistake = false;
+  bool _melodyDone = false;
+
   /// Middle line of the treble staff (B4).
   int _step = 4;
 
@@ -170,6 +183,10 @@ class _HomePageState extends State<HomePage> {
   int? _playbackIndex;
   int _playbackToken = 0;
   Timer? _playbackTimer;
+
+  /// Invalidates an in-flight read-and-play phrase playback, so a new phrase,
+  /// an exit or a tapped key stops the notes still queued behind it.
+  int _melodyToken = 0;
 
   void _setStep(int step) {
     setState(() => _step = step.clamp(kMinStaffStep, kMaxStaffStep));
@@ -484,14 +501,17 @@ class _HomePageState extends State<HomePage> {
   void _selectTab(_HomeTab tab) {
     if (tab == _tab) return;
     if (_playback != null) _stopSequence();
+    _stopMelody();
     _stopMetronome();
     _stopRegister();
-    final startPractice = tab == _HomeTab.practice && !_practice && !_guided;
+    final startPractice =
+        tab == _HomeTab.practice && !_practice && !_guided && !_read;
     setState(() {
       _tab = tab;
       if (tab != _HomeTab.practice) {
         _practice = false;
         _guided = false;
+        _read = false;
       }
     });
     if (startPractice) _startPractice();
@@ -502,6 +522,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _guided = true;
       _practice = false;
+      _read = false;
       _lessonIndex = 0;
       _stepIndex = 0;
     });
@@ -523,6 +544,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _practice = true;
       _guided = false;
+      _read = false;
       _scaleType = null;
       _chordMode = ChordMode.off;
       _progression = null;
@@ -578,6 +600,97 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// Enters read-and-play mode: a random phrase appears on the staff and the
+  /// learner plays it back, left to right, on the keyboard.
+  void _startRead() {
+    if (_playback != null) _stopSequence();
+    _stopMelody();
+    setState(() {
+      _read = true;
+      _practice = false;
+      _guided = false;
+      _scaleType = null;
+      _chordMode = ChordMode.off;
+      _progression = null;
+      _chordQuality = null;
+      _melodyBuilder = MelodyBuilder();
+    });
+    _nextMelody();
+  }
+
+  void _exitRead() {
+    if (_playback != null) _stopSequence();
+    _stopMelody();
+    setState(() {
+      _read = false;
+      _tab = _HomeTab.note;
+    });
+  }
+
+  /// Starts a fresh random phrase.
+  void _nextMelody() {
+    _stopMelody();
+    final melody = _melodyBuilder!.next();
+    setState(() {
+      _melody = melody;
+      _melodyIndex = 0;
+      _melodyMistake = false;
+      _melodyDone = false;
+      _step = melody.steps.first;
+    });
+  }
+
+  /// Handles a key the learner tapped while reading the phrase.
+  void _tapMelodyKey(int pitchClass) {
+    final melody = _melody;
+    if (melody == null || _melodyDone) return;
+    final note = _key.applyTo(_clef.noteAt(melody.steps[_melodyIndex]));
+    if (pitchClass != note.midi % 12) {
+      setState(() => _melodyMistake = true);
+      return;
+    }
+    _stopMelody();
+    unawaited(
+      _notePlayer.play([note.frequency], duration: _sequenceNoteDuration),
+    );
+    setState(() {
+      _melodyMistake = false;
+      if (_melodyIndex + 1 < melody.length) {
+        _melodyIndex++;
+      } else {
+        _melodyDone = true;
+      }
+      _step = melody.steps[_melodyIndex];
+    });
+  }
+
+  /// Plays the whole phrase so the learner can check their reading.
+  ///
+  /// The notes are queued one at a time, each awaited before the next is
+  /// scheduled, because [NotePlayer.play] sounds its frequencies together (a
+  /// chord). This is the same one-note-at-a-time approach the scale and
+  /// progression sequences use, which keeps the notes distinct and even on
+  /// mobile.
+  Future<void> _playMelody() async {
+    final melody = _melody;
+    if (melody == null) return;
+    _stopSequence();
+    final token = ++_melodyToken;
+    for (final step in melody.steps) {
+      if (!mounted || token != _melodyToken) return;
+      await _notePlayer.play([
+        _key.applyTo(_clef.noteAt(step)).frequency,
+      ], duration: _sequenceNoteDuration);
+      if (!mounted || token != _melodyToken) return;
+      await Future<void>.delayed(_sequenceStepGap);
+    }
+  }
+
+  /// Stops a phrase playback in progress.
+  void _stopMelody() {
+    _melodyToken++;
+  }
+
   void _nextLessonStep() {
     if (!_practiceMatched) return;
     if (!_isLastStep) {
@@ -629,10 +742,10 @@ class _HomePageState extends State<HomePage> {
     _bpmRestartTimer?.cancel();
     _bpmRestartTimer = null;
     unawaited(
-      _notePlayer.startClickTrack(
-        [_clickAccentHz, ...List.filled(_beatsPerBar - 1, _clickBeatHz)],
-        beatInterval(_bpm),
-      ),
+      _notePlayer.startClickTrack([
+        _clickAccentHz,
+        ...List.filled(_beatsPerBar - 1, _clickBeatHz),
+      ], beatInterval(_bpm)),
     );
     _lastBeatAt = null;
     _beat.value = _beatsPerBar - 1;
@@ -733,10 +846,9 @@ class _HomePageState extends State<HomePage> {
     // A tone slightly shorter than the gap ends on its own release instead of
     // being cut off by the next one, which would click.
     unawaited(
-      _notePlayer.play(
-        [frequencyForPitchClass(_registerPitchClass, _registerZone)],
-        duration: const Duration(milliseconds: 650),
-      ),
+      _notePlayer.play([
+        frequencyForPitchClass(_registerPitchClass, _registerZone),
+      ], duration: const Duration(milliseconds: 650)),
     );
     _registerTimer = Timer(
       const Duration(milliseconds: 700),
@@ -764,10 +876,9 @@ class _HomePageState extends State<HomePage> {
     setState(() => _registerZone = zone);
     // Shorter than the 500 ms step so each note finishes before the next.
     unawaited(
-      _notePlayer.play(
-        [frequencyForPitchClass(_registerPitchClass, zone)],
-        duration: const Duration(milliseconds: 450),
-      ),
+      _notePlayer.play([
+        frequencyForPitchClass(_registerPitchClass, zone),
+      ], duration: const Duration(milliseconds: 450)),
     );
     final done = zone >= kMaxZone;
     _registerTimer = Timer(const Duration(milliseconds: 500), () {
@@ -916,7 +1027,8 @@ class _HomePageState extends State<HomePage> {
 
   void _selectBuilderMatch(ChordMatch match) {
     setState(() {
-      _builderMatch = _builderMatch == null ||
+      _builderMatch =
+          _builderMatch == null ||
               _builderMatch!.rootPitchClass != match.rootPitchClass ||
               _builderMatch!.quality != match.quality
           ? match
@@ -943,6 +1055,7 @@ class _HomePageState extends State<HomePage> {
     final chord = _chordFor(chordScale, note);
     final practiceActive = _tab == _HomeTab.practice && _practice;
     final guidedActive = _tab == _HomeTab.practice && _guided;
+    final readActive = _tab == _HomeTab.practice && _read;
     int? playingPitchClass;
     var playingUpperOctave = false;
     if (_playback == _Playback.highlight &&
@@ -990,15 +1103,23 @@ class _HomePageState extends State<HomePage> {
                     clef: _clef,
                     keySignature: _key,
                     step: _step,
-                    chordSteps: chord?.staffSteps(_step) ?? const [],
+                    chordSteps: readActive
+                        ? const []
+                        : chord?.staffSteps(_step) ?? const [],
+                    melodySteps: readActive
+                        ? _melody?.steps ?? const []
+                        : const [],
+                    melodyIndex: _melodyIndex,
                     targetStep: guidedActive ? _guidedTarget : null,
                     showLabel:
                         widget.display.showStaffLabel &&
+                        !readActive &&
                         (!practiceActive || _answered != null),
-                    interactive: !practiceActive,
+                    interactive: !practiceActive && !readActive,
                     naming: widget.display.naming,
                     showEnharmonic: widget.display.showEnharmonic,
-                    semanticValue: (!practiceActive || _answered != null)
+                    semanticValue:
+                        (!readActive && (!practiceActive || _answered != null))
                         ? note.name
                         : null,
                     onStepChanged: (step) {
@@ -1007,7 +1128,10 @@ class _HomePageState extends State<HomePage> {
                       setState(() => _step = step);
                     },
                   ),
-                  if (widget.showCoachMark && !practiceActive && !guidedActive)
+                  if (widget.showCoachMark &&
+                      !practiceActive &&
+                      !guidedActive &&
+                      !readActive)
                     Positioned(
                       left: 16,
                       right: 16,
@@ -1021,139 +1145,153 @@ class _HomePageState extends State<HomePage> {
 
               final panel = switch (_tab) {
                 _HomeTab.note => _Controls(
-                    key: const Key('controls'),
-                    sidebar: sidebar,
-                    clef: _clef,
-                    keySignature: _key,
-                    display: widget.display,
-                    scale: scale,
-                    chord: chord,
-                    chordScale: chordScale,
-                    chordMode: _chordMode,
-                    inversion: chord?.inversion ?? 0,
-                    selectedQuality: _chordQuality,
-                    progression: _progression,
-                    step: _step,
-                    playingPitchClass: playingPitchClass,
-                    playingUpperOctave: playingUpperOctave,
-                    highlightPlaying: _playback == _Playback.highlight,
-                    progressionPlaying: _playback == _Playback.progression,
-                    activeProgressionIndex: _playback == _Playback.progression
-                        ? _playbackIndex
-                        : null,
-                    onPlay: _playNow,
-                    onPlayHighlight: () =>
-                        _toggleSequence(_Playback.highlight),
-                    onPlayProgression: () =>
-                        _toggleSequence(_Playback.progression),
-                    onClefChanged: (clef) {
-                      _stopSequence();
-                      setState(() => _clef = clef);
-                    },
-                    onKeyChanged: (key) {
-                      _stopSequence();
-                      setState(() => _key = key);
-                    },
-                    onScaleTypeChanged: (type) {
-                      _stopSequence();
-                      setState(() => _scaleType = type);
-                    },
-                    onChordModeChanged: _setChordMode,
-                    onQualitySelected: _selectChordQuality,
-                    onInversionChanged: (value) {
-                      _stopSequence();
-                      setState(() => _inversion = value);
-                    },
-                    onProgressionChanged: (value) {
-                      _stopSequence();
-                      setState(() => _progression = value);
-                    },
-                    onDegreeSelected: _moveToDegree,
-                    onStepChanged: (step) {
-                      _stopSequence();
-                      _setStep(step);
-                    },
-                  ),
-                _HomeTab.practice => guidedActive
-                    ? _GuidedPanel(
-                        key: const Key('guided-panel'),
-                        lesson: _lesson,
-                        step: _lessonStep,
-                        lessonIndex: _lessonIndex,
-                        stepIndex: _stepIndex,
-                        totalSteps: _totalSteps,
-                        completedSteps: _completedSteps,
-                        isLastStep: _isLastStep,
-                        matched: _practiceMatched,
-                        onBack: _previousLessonStep,
-                        onNext: _nextLessonStep,
-                        onExit: _exitGuided,
-                      )
-                    : _question == null
-                    ? const SizedBox.shrink()
-                    : _PracticePanel(
-                        key: const Key('practice-panel'),
-                        question: _question!,
-                        answered: _answered,
-                        attempts: _attempts,
-                        correctAnswers: _correctAnswers,
-                        streak: _streak,
-                        bestStreak: _bestStreak,
-                        onAnswer: _answerPractice,
-                        onNext: _nextPracticeQuestion,
-                        onReset: _resetPracticeScore,
-                        onExit: _exitPractice,
-                      ),
+                  key: const Key('controls'),
+                  sidebar: sidebar,
+                  clef: _clef,
+                  keySignature: _key,
+                  display: widget.display,
+                  scale: scale,
+                  chord: chord,
+                  chordScale: chordScale,
+                  chordMode: _chordMode,
+                  inversion: chord?.inversion ?? 0,
+                  selectedQuality: _chordQuality,
+                  progression: _progression,
+                  step: _step,
+                  playingPitchClass: playingPitchClass,
+                  playingUpperOctave: playingUpperOctave,
+                  highlightPlaying: _playback == _Playback.highlight,
+                  progressionPlaying: _playback == _Playback.progression,
+                  activeProgressionIndex: _playback == _Playback.progression
+                      ? _playbackIndex
+                      : null,
+                  onPlay: _playNow,
+                  onPlayHighlight: () => _toggleSequence(_Playback.highlight),
+                  onPlayProgression: () =>
+                      _toggleSequence(_Playback.progression),
+                  onClefChanged: (clef) {
+                    _stopSequence();
+                    setState(() => _clef = clef);
+                  },
+                  onKeyChanged: (key) {
+                    _stopSequence();
+                    setState(() => _key = key);
+                  },
+                  onScaleTypeChanged: (type) {
+                    _stopSequence();
+                    setState(() => _scaleType = type);
+                  },
+                  onChordModeChanged: _setChordMode,
+                  onQualitySelected: _selectChordQuality,
+                  onInversionChanged: (value) {
+                    _stopSequence();
+                    setState(() => _inversion = value);
+                  },
+                  onProgressionChanged: (value) {
+                    _stopSequence();
+                    setState(() => _progression = value);
+                  },
+                  onDegreeSelected: _moveToDegree,
+                  onStepChanged: (step) {
+                    _stopSequence();
+                    _setStep(step);
+                  },
+                ),
+                _HomeTab.practice =>
+                  guidedActive
+                      ? _GuidedPanel(
+                          key: const Key('guided-panel'),
+                          lesson: _lesson,
+                          step: _lessonStep,
+                          lessonIndex: _lessonIndex,
+                          stepIndex: _stepIndex,
+                          totalSteps: _totalSteps,
+                          completedSteps: _completedSteps,
+                          isLastStep: _isLastStep,
+                          matched: _practiceMatched,
+                          onBack: _previousLessonStep,
+                          onNext: _nextLessonStep,
+                          onExit: _exitGuided,
+                        )
+                      : readActive
+                      ? _ReadPanel(
+                          key: const Key('read-panel'),
+                          melody: _melody!,
+                          index: _melodyIndex,
+                          mistake: _melodyMistake,
+                          done: _melodyDone,
+                          clef: _clef,
+                          keySignature: _key,
+                          onTapPitchClass: _tapMelodyKey,
+                          onPlay: _playMelody,
+                          onNext: _nextMelody,
+                          onExit: _exitRead,
+                        )
+                      : _question == null
+                      ? const SizedBox.shrink()
+                      : _PracticePanel(
+                          key: const Key('practice-panel'),
+                          question: _question!,
+                          answered: _answered,
+                          attempts: _attempts,
+                          correctAnswers: _correctAnswers,
+                          streak: _streak,
+                          bestStreak: _bestStreak,
+                          onAnswer: _answerPractice,
+                          onNext: _nextPracticeQuestion,
+                          onReset: _resetPracticeScore,
+                          onExit: _exitPractice,
+                        ),
                 _HomeTab.metronome => MetronomePanel(
-                    bpm: _bpm,
-                    onBpmChanged: _setBpm,
-                    onBeatsPerBarChanged: _setBeatsPerBar,
-                    playing: _metronomeOn,
-                    beat: _beat,
-                    beatsPerBar: _beatsPerBar,
-                    onToggle: _toggleMetronome,
-                    pitchClass: _registerPitchClass,
-                    onPitchClassChanged: (pitchClass) {
-                      _stopRegister();
-                      setState(() => _registerPitchClass = pitchClass);
-                    },
-                    zone: _registerZone,
-                    onZoneChanged: (zone) {
-                      _stopRegister();
-                      setState(() => _registerZone = zone);
-                    },
-                    looping: _registerLooping,
-                    sweeping: _registerSweeping,
-                    onPlayNote: _playRegisterNote,
-                    onToggleLoop: _toggleRegisterLoop,
-                    onSweep: _sweepRegister,
-                  ),
+                  bpm: _bpm,
+                  onBpmChanged: _setBpm,
+                  onBeatsPerBarChanged: _setBeatsPerBar,
+                  playing: _metronomeOn,
+                  beat: _beat,
+                  beatsPerBar: _beatsPerBar,
+                  onToggle: _toggleMetronome,
+                  pitchClass: _registerPitchClass,
+                  onPitchClassChanged: (pitchClass) {
+                    _stopRegister();
+                    setState(() => _registerPitchClass = pitchClass);
+                  },
+                  zone: _registerZone,
+                  onZoneChanged: (zone) {
+                    _stopRegister();
+                    setState(() => _registerZone = zone);
+                  },
+                  looping: _registerLooping,
+                  sweeping: _registerSweeping,
+                  onPlayNote: _playRegisterNote,
+                  onToggleLoop: _toggleRegisterLoop,
+                  onSweep: _sweepRegister,
+                ),
                 _HomeTab.chords => ChordBuilderPanel(
-                    notes: _builderNotes,
-                    selectedIndex: _builderSelected,
-                    clef: _clef,
-                    keySignature: _key,
-                    matches: _builderMatches(),
-                    selectedMatch: _builderMatch,
-                    maxNotes: _maxBuilderNotes,
-                    rootNoteFor: _builderRootNote,
-                    onSelectNote: (index) =>
-                        setState(() => _builderSelected = index),
-                    onAddNote: _addBuilderNote,
-                    onMoveNote: _moveBuilderNote,
-                    onAccidentalChanged: _setBuilderAccidental,
-                    onRemoveNote: _removeBuilderNote,
-                    onShowSuggestions: _addBuilderNoteAbove,
-                    onAddBelow: _addBuilderNoteBelow,
-                    onNudgeSelected: _nudgeBuilderNote,
-                    onPlayChord: _playBuilderChord,
-                    onPlayMatch: _playBuilderMatch,
-                    onSelectMatch: _selectBuilderMatch,
-                    keySelector: _KeySelector(
-                      value: _key,
-                      onChanged: (key) => setState(() => _key = key),
-                    ),
+                  notes: _builderNotes,
+                  selectedIndex: _builderSelected,
+                  clef: _clef,
+                  keySignature: _key,
+                  matches: _builderMatches(),
+                  selectedMatch: _builderMatch,
+                  maxNotes: _maxBuilderNotes,
+                  rootNoteFor: _builderRootNote,
+                  onSelectNote: (index) =>
+                      setState(() => _builderSelected = index),
+                  onAddNote: _addBuilderNote,
+                  onMoveNote: _moveBuilderNote,
+                  onAccidentalChanged: _setBuilderAccidental,
+                  onRemoveNote: _removeBuilderNote,
+                  onShowSuggestions: _addBuilderNoteAbove,
+                  onAddBelow: _addBuilderNoteBelow,
+                  onNudgeSelected: _nudgeBuilderNote,
+                  onPlayChord: _playBuilderChord,
+                  onPlayMatch: _playBuilderMatch,
+                  onSelectMatch: _selectBuilderMatch,
+                  keySelector: _KeySelector(
+                    value: _key,
+                    onChanged: (key) => setState(() => _key = key),
                   ),
+                ),
               };
 
               if (_tab == _HomeTab.metronome || _tab == _HomeTab.chords) {
@@ -1253,29 +1391,51 @@ class _HomePageState extends State<HomePage> {
     ),
   ];
 
-  /// The Practice / Guided path switch shown above the practice tab.
+  /// Which activity the Practice tab is currently showing.
+  _PracticeActivity get _activity => _guided
+      ? _PracticeActivity.guided
+      : _read
+      ? _PracticeActivity.read
+      : _PracticeActivity.quiz;
+
+  void _setActivity(_PracticeActivity activity) {
+    switch (activity) {
+      case _PracticeActivity.quiz:
+        _startPractice();
+      case _PracticeActivity.guided:
+        _startGuided();
+      case _PracticeActivity.read:
+        _startRead();
+    }
+  }
+
+  /// The Practice / Guided path / Read & play switch above the practice tab.
   Widget get _practiceModeToggle => Padding(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
     child: Align(
       alignment: Alignment.centerLeft,
-      child: SegmentedButton<bool>(
+      child: SegmentedButton<_PracticeActivity>(
         key: const Key('practice-mode-toggle'),
         showSelectedIcon: false,
         segments: const [
           ButtonSegment(
-            value: false,
+            value: _PracticeActivity.quiz,
             label: Text('Practice'),
             icon: Icon(Icons.quiz),
           ),
           ButtonSegment(
-            value: true,
-            label: Text('Guided path'),
+            value: _PracticeActivity.read,
+            label: Text('Play'),
+            icon: Icon(Icons.piano),
+          ),
+          ButtonSegment(
+            value: _PracticeActivity.guided,
+            label: Text('Guide'),
             icon: Icon(Icons.school),
           ),
         ],
-        selected: {_guided},
-        onSelectionChanged: (selection) =>
-            selection.first ? _startGuided() : _startPractice(),
+        selected: {_activity},
+        onSelectionChanged: (selection) => _setActivity(selection.first),
       ),
     ),
   );
@@ -1289,10 +1449,7 @@ class _HomePageState extends State<HomePage> {
     onDestinationSelected: (index) => _selectTab(_HomeTab.values[index]),
     destinations: [
       for (final tab in _HomeTab.values)
-        NavigationRailDestination(
-          icon: Icon(tab.icon),
-          label: Text(tab.label),
-        ),
+        NavigationRailDestination(icon: Icon(tab.icon), label: Text(tab.label)),
     ],
   );
 
@@ -1753,6 +1910,140 @@ class _PracticePanel extends StatelessWidget {
         textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
       ),
       child: Text(choice),
+    );
+  }
+}
+
+/// The read-and-play panel: a random phrase is drawn on the staff and the
+/// learner plays it back, in order, on the tappable keyboard below.
+class _ReadPanel extends StatelessWidget {
+  const _ReadPanel({
+    super.key,
+    required this.melody,
+    required this.index,
+    required this.mistake,
+    required this.done,
+    required this.clef,
+    required this.keySignature,
+    required this.onTapPitchClass,
+    required this.onPlay,
+    required this.onNext,
+    required this.onExit,
+  });
+
+  final Melody melody;
+
+  /// Index of the phrase note the learner is reading.
+  final int index;
+
+  /// True after a key that was not the next note was tapped.
+  final bool mistake;
+
+  /// True once every note has been played.
+  final bool done;
+
+  final Clef clef;
+  final MusicalKey keySignature;
+  final ValueChanged<int> onTapPitchClass;
+  final VoidCallback onPlay;
+  final VoidCallback onNext;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final note = keySignature.applyTo(clef.noteAt(melody.steps[index]));
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.piano, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Play',
+                      key: const Key('read-title'),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ),
+                  Text(
+                    '${index + 1} / ${melody.length}',
+                    key: const Key('read-progress'),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  IconButton(
+                    key: const Key('read-exit'),
+                    tooltip: 'Exit play',
+                    icon: const Icon(Icons.close),
+                    onPressed: onExit,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                done
+                    ? 'Phrase complete.'
+                    : mistake
+                    ? 'Not quite \u2014 try the next note again.'
+                    : 'Play the notes on the staff, left to right.',
+                key: const Key('read-prompt'),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: mistake ? scheme.error : null,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Best on a fresh phrase each time. '
+                'Wrong keys are not counted, so take your time.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      key: const Key('read-play'),
+                      onPressed: onPlay,
+                      icon: const Icon(Icons.volume_up),
+                      label: const Text('Hear phrase'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      key: const Key('read-next'),
+                      onPressed: onNext,
+                      icon: const Icon(Icons.refresh),
+                      label: Text(done ? 'New phrase' : 'Skip'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              PianoKeyboard(
+                key: const Key('read-keyboard'),
+                midi: note.midi,
+                height: 92,
+                showHighlight: false,
+                onPitchClassTap: onTapPitchClass,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2760,5 +3051,3 @@ class _ThemeOption extends StatelessWidget {
     return Row(children: [Icon(icon), const SizedBox(width: 12), Text(label)]);
   }
 }
-
-

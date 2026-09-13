@@ -30,6 +30,9 @@ class NotationPainter extends CustomPainter {
     this.chordColor = const Color(0xFF000000),
     this.targetStep,
     this.targetColor,
+    this.melodySteps = const [],
+    this.melodyIndex = 0,
+    this.melodyActiveColor = const Color(0xFF000000),
   });
 
   final StaffGeometry geometry;
@@ -65,6 +68,16 @@ class NotationPainter extends CustomPainter {
 
   /// Colour of the hollow target notehead. Defaults to [noteColor].
   final Color? targetColor;
+
+  /// Staff steps of a phrase drawn left to right. Empty for a single note.
+  final List<int> melodySteps;
+
+  /// Index of the phrase note the learner is currently reading; drawn in
+  /// [melodyActiveColor] and the rest in [noteColor].
+  final int melodyIndex;
+
+  /// Colour of the active phrase note.
+  final Color melodyActiveColor;
 
   /// Staff step the label describes: the lowest chord tone (the bass) when a
   /// chord is shown, otherwise the written note.
@@ -102,6 +115,10 @@ class NotationPainter extends CustomPainter {
     _paintStaff(canvas, linePaint);
     _paintClef(canvas);
     _paintKeySignature(canvas);
+    if (melodySteps.isNotEmpty) {
+      _paintMelody(canvas, linePaint);
+      return;
+    }
     _paintLedgerLines(canvas, linePaint);
     _paintTarget(canvas);
     if (chordSteps.isEmpty) {
@@ -148,6 +165,55 @@ class NotationPainter extends CustomPainter {
       );
       _paintGlyph(canvas, glyph, x: x, baselineY: geometry.yForStep(item.step));
       x += spacing;
+    }
+  }
+
+  /// Draws a phrase left to right, each note with its own stem and ledger
+  /// lines, highlighting the note the learner is reading.
+  void _paintMelody(Canvas canvas, Paint linePaint) {
+    final count = melodySteps.length;
+    final keyWidth = key.signatureFor(clef).length * geometry.space * 0.9;
+    final startX =
+        geometry.staffLeft +
+        (clef.advance + 0.35) * geometry.space +
+        keyWidth +
+        geometry.space * 1.2;
+    final endX = geometry.staffRight - geometry.space * 1.2;
+    final spacing = count > 1 ? (endX - startX) / (count - 1) : 0.0;
+    final stemLength = geometry.space * 3.5;
+
+    for (var i = 0; i < count; i++) {
+      final noteStep = melodySteps[i];
+      final x = startX + spacing * i;
+      final color = i == melodyIndex ? melodyActiveColor : noteColor;
+      final stroke = Paint()
+        ..color = color
+        ..strokeWidth = (geometry.space * 0.12).clamp(1.2, 4.0)
+        ..strokeCap = StrokeCap.round;
+
+      for (final ledgerStep in geometry.ledgerStepsFor(noteStep)) {
+        final y = geometry.yForStep(ledgerStep);
+        canvas.drawLine(
+          Offset(x - geometry.space * 0.95, y),
+          Offset(x + geometry.space * 0.95, y),
+          linePaint,
+        );
+      }
+
+      final notehead = _layoutGlyph(
+        NotationGlyphs.noteheadBlack,
+        geometry.space * 4,
+        color,
+      );
+      final noteY = geometry.yForStep(noteStep);
+      final stemUp = noteStep < 4;
+      final stemX = x + (stemUp ? 1 : -1) * notehead.width / 2;
+      canvas.drawLine(
+        Offset(stemX, noteY),
+        Offset(stemX, noteY + (stemUp ? -stemLength : stemLength)),
+        stroke,
+      );
+      _paintGlyph(canvas, notehead, centerX: x, baselineY: noteY);
     }
   }
 
@@ -335,6 +401,9 @@ class NotationPainter extends CustomPainter {
         !listEquals(old.chordSteps, chordSteps) ||
         old.chordColor != chordColor ||
         old.targetStep != targetStep ||
-        old.targetColor != targetColor;
+        old.targetColor != targetColor ||
+        !listEquals(old.melodySteps, melodySteps) ||
+        old.melodyIndex != melodyIndex ||
+        old.melodyActiveColor != melodyActiveColor;
   }
 }
