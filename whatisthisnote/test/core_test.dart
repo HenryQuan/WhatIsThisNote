@@ -714,6 +714,25 @@ void main() {
       }
     });
 
+    test('lays a click track out as one evenly spaced bar', () {
+      final bytes = barWav(
+        [440.0, 220.0],
+        step: const Duration(milliseconds: 100),
+        tone: const Duration(milliseconds: 20),
+        sampleRate: 8000,
+      );
+      final data = ByteData.sublistView(bytes);
+      // Two 100 ms beats at 8 kHz: 1600 samples, plus the 44-byte header.
+      expect(bytes.length, 44 + 1600 * 2);
+      int sample(int index) => data.getInt16(44 + index * 2, Endian.little);
+      // The first click sounds near the bar start...
+      expect(sample(5).abs(), greaterThan(0));
+      // ...the beat is silent before the next click...
+      expect(sample(700), 0);
+      // ...and the second click starts exactly one step in.
+      expect(sample(800 + 5).abs(), greaterThan(0));
+    });
+
     test('mixes every frequency into the samples', () {
       final one = toneWav(
         [440.0],

@@ -14,12 +14,59 @@ Uint8List toneWav(
   Duration duration = const Duration(milliseconds: 700),
   int sampleRate = 44100,
   double amplitude = 0.6,
+}) => _wavBytes(
+  _toneSamples(
+    frequencies,
+    duration: duration,
+    sampleRate: sampleRate,
+    amplitude: amplitude,
+  ),
+  sampleRate,
+);
+
+/// Renders one seamless bar for a loop player: [frequencies] are played one
+/// after another, each starting every [step] and ringing for [tone]. The bar
+/// is mostly silence with short clicks, so a loop player can repeat it without
+/// a seam, which keeps a metronome's beats even and in time.
+Uint8List barWav(
+  List<double> frequencies, {
+  required Duration step,
+  Duration tone = const Duration(milliseconds: 45),
+  int sampleRate = 44100,
+  double amplitude = 0.6,
+}) {
+  assert(step > Duration.zero, 'step must be greater than zero');
+  final stepSamples =
+      step.inMicroseconds * sampleRate ~/ Duration.microsecondsPerSecond;
+  final bar = Int16List(stepSamples * frequencies.length);
+  final clicks = <double, Int16List>{};
+  for (var i = 0; i < frequencies.length; i++) {
+    final click = clicks.putIfAbsent(
+      frequencies[i],
+      () => _toneSamples(
+        [frequencies[i]],
+        duration: tone,
+        sampleRate: sampleRate,
+        amplitude: amplitude,
+      ),
+    );
+    final start = i * stepSamples;
+    final end = start + click.length < bar.length
+        ? start + click.length
+        : bar.length;
+    bar.setRange(start, end, click);
+  }
+  return _wavBytes(bar, sampleRate);
+}
+
+Int16List _toneSamples(
+  List<double> frequencies, {
+  Duration duration = const Duration(milliseconds: 700),
+  int sampleRate = 44100,
+  double amplitude = 0.6,
 }) {
   assert(sampleRate > 0, 'sampleRate must be positive');
-  assert(
-    duration > Duration.zero,
-    'duration must be greater than zero',
-  );
+  assert(duration > Duration.zero, 'duration must be greater than zero');
 
   final sampleCount =
       duration.inMicroseconds * sampleRate ~/ Duration.microsecondsPerSecond;
@@ -46,8 +93,7 @@ Uint8List toneWav(
       final releaseGain = sampleCount - i < release
           ? (sampleCount - i) / release
           : 1.0;
-      final envelope =
-          attackGain * releaseGain * math.exp(-2.5 * progress);
+      final envelope = attackGain * releaseGain * math.exp(-2.5 * progress);
 
       var value = 0.0;
       for (final partials in voicePartials) {
@@ -64,7 +110,7 @@ Uint8List toneWav(
     }
   }
 
-  return _wavBytes(samples, sampleRate);
+  return samples;
 }
 
 /// Middle C's frequency, in hertz. Notes at or above it keep the original warm
@@ -83,12 +129,14 @@ const int _maxHarmonics = 16;
 /// change gradual, and harmonics never reach Nyquist.
 List<(double, double)> _partialsFor(double frequency, int sampleRate) {
   final nyquist = sampleRate / 2;
-  final richness = (math.log(_middleCHz / frequency) / math.ln2).clamp(0.0, 1.0);
+  final richness = (math.log(_middleCHz / frequency) / math.ln2).clamp(
+    0.0,
+    1.0,
+  );
   if (richness == 0) {
     return [
       for (final (harmonic, gain) in const [(1, 1.0), (2, 0.25)])
-        if (frequency * harmonic < nyquist)
-          (frequency * harmonic, gain),
+        if (frequency * harmonic < nyquist) (frequency * harmonic, gain),
     ];
   }
 

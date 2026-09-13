@@ -38,6 +38,10 @@ const double _navRailBreakpoint = 900;
 /// Most notes the custom chord builder lets the learner stack.
 const int _maxBuilderNotes = 8;
 
+/// Pitch of the metronome's accented downbeat and of the other beats, in hertz.
+const double _clickAccentHz = 1318.51;
+const double _clickBeatHz = 880.0;
+
 /// Top-level destinations of the app.
 enum _HomeTab { note, practice, metronome, chords }
 
@@ -128,12 +132,19 @@ class _HomePageState extends State<HomePage> {
   /// Width of the wide-layout controls rail, dragged by the user.
   double _sidebarWidth = 380;
 
-  /// Metronome tempo (beats per minute), whether the click is running and the
-  /// beat currently sounding.
+  /// Metronome tempo (beats per minute) and whether the click is running. The
+  /// sounding beat is a notifier so a tick repaints only the beat dots instead
+  /// of rebuilding the whole page, which keeps the click visually smooth.
   int _bpm = 90;
+  int _beatsPerBar = kBeatsPerBar;
   bool _metronomeOn = false;
-  int _beat = 0;
+  final ValueNotifier<int> _beat = ValueNotifier<int>(0);
   Timer? _metronomeTimer;
+  Timer? _bpmRestartTimer;
+
+  /// When the last beat sounded, used to schedule the next one against a fixed
+  /// timeline so rounding and frame time never make the tempo drift.
+  DateTime? _lastBeatAt;
 
   /// Register finder selection (a pitch class and an octave) plus its looping
   /// and sweeping playback.
@@ -176,6 +187,8 @@ class _HomePageState extends State<HomePage> {
     _playbackTimer?.cancel();
     _playbackToken++;
     _metronomeTimer?.cancel();
+    _bpmRestartTimer?.cancel();
+    _beat.dispose();
     _registerTimer?.cancel();
     _ownedPlayer?.dispose();
     super.dispose();
@@ -601,45 +614,87 @@ class _HomePageState extends State<HomePage> {
     }
     _stopRegister();
     _stopSequence();
-    setState(() {
-      _metronomeOn = true;
-      _beat = -1;
-    });
+    setState(() => _metronomeOn = true);
+    _restartClick();
+  }
+
+  /// Starts the looping click and re-anchors the beat dots to it. The whole
+  /// bar is rendered and looped by the audio backend, so the click stays even
+  /// and the dots only have to follow it.
+  void _restartClick() {
+    if (!_metronomeOn) return;
+    _bpmRestartTimer?.cancel();
+    _bpmRestartTimer = null;
+    unawaited(
+      _notePlayer.startClickTrack(
+        [_clickAccentHz, ...List.filled(_beatsPerBar - 1, _clickBeatHz)],
+        beatInterval(_bpm),
+      ),
+    );
+    _lastBeatAt = null;
+    _beat.value = _beatsPerBar - 1;
     _advanceBeat();
   }
 
+  /// Advances the beat dots. The click itself comes from the looping track, so
+  /// this only keeps the on-screen pulse lined up with it.
   void _advanceBeat() {
     if (!_metronomeOn) return;
-    setState(() => _beat = (_beat + 1) % 4);
-    // The downbeat is higher so it is easy to pick out of the pulse.
-    unawaited(
-      _notePlayer.play(
-        [_beat == 0 ? 1318.51 : 880.0],
-        duration: const Duration(milliseconds: 50),
-      ),
-    );
-    _metronomeTimer = Timer(beatInterval(_bpm), _advanceBeat);
+    _lastBeatAt = DateTime.now();
+    _beat.value = (_beat.value + 1) % _beatsPerBar;
+    _scheduleNextBeat();
+  }
+
+  /// Queues the next beat on the timeline anchored at [_lastBeatAt], so the
+  /// gap is measured from when the beat sounded rather than from when its
+  /// callback finished. If a long frame made us fall behind the timeline, the
+  /// anchor is reset instead of firing a burst of catch-up updates.
+  void _scheduleNextBeat() {
+    _metronomeTimer?.cancel();
+    final interval = beatInterval(_bpm);
+    final base = _lastBeatAt;
+    var delay = base == null
+        ? interval
+        : base.add(interval).difference(DateTime.now());
+    if (delay.isNegative) {
+      _lastBeatAt = DateTime.now();
+      delay = interval;
+    }
+    _metronomeTimer = Timer(delay, _advanceBeat);
   }
 
   void _stopMetronome() {
+    final wasOn = _metronomeOn;
     _metronomeTimer?.cancel();
     _metronomeTimer = null;
-    if (_metronomeOn || _beat != 0) {
-      setState(() {
-        _metronomeOn = false;
-        _beat = 0;
-      });
+    _bpmRestartTimer?.cancel();
+    _bpmRestartTimer = null;
+    if (wasOn || _beat.value != 0) {
+      _metronomeOn = false;
+      _beat.value = 0;
+      setState(() {});
     }
+    // Only touch the player when a click could be sounding; this must not pull
+    // an audio plugin into existence just because the user changed tabs.
+    if (wasOn) unawaited(_notePlayer.stopClickTrack());
   }
 
   void _setBpm(int bpm) {
     final clamped = bpm.clamp(kMinBpm, kMaxBpm);
     if (clamped == _bpm) return;
     setState(() => _bpm = clamped);
-    if (_metronomeOn) {
-      _metronomeTimer?.cancel();
-      _metronomeTimer = Timer(beatInterval(_bpm), _advanceBeat);
-    }
+    if (!_metronomeOn) return;
+    // Restarting the loop on every drag step would stutter the click, so the
+    // new tempo is applied once the user pauses.
+    _bpmRestartTimer?.cancel();
+    _bpmRestartTimer = Timer(const Duration(milliseconds: 150), _restartClick);
+  }
+
+  void _setBeatsPerBar(int beats) {
+    if (beats == _beatsPerBar) return;
+    setState(() => _beatsPerBar = beats);
+    // The bar is baked into the click track, so it has to be re-rendered.
+    if (_metronomeOn) _restartClick();
   }
 
   /// Plays the register finder's current note once.
@@ -672,10 +727,13 @@ class _HomePageState extends State<HomePage> {
 
   void _loopRegister(int token) {
     if (token != _registerToken) return;
+    // A tone slightly shorter than the gap ends on its own release instead of
+    // being cut off by the next one, which would click.
     unawaited(
-      _notePlayer.play([
-        frequencyForPitchClass(_registerPitchClass, _registerZone),
-      ]),
+      _notePlayer.play(
+        [frequencyForPitchClass(_registerPitchClass, _registerZone)],
+        duration: const Duration(milliseconds: 650),
+      ),
     );
     _registerTimer = Timer(
       const Duration(milliseconds: 700),
@@ -683,7 +741,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Walks C1 up to C8, moving the zone selection with each note.
+  /// Walks the selected note across every zone, moving the octave selection
+  /// with each note so the learner hears the same pitch in each register.
   void _sweepRegister() {
     if (_registerSweeping) {
       _stopRegister();
@@ -699,11 +758,14 @@ class _HomePageState extends State<HomePage> {
 
   void _sweepStep(int token, int zone) {
     if (token != _registerToken) return;
-    setState(() {
-      _registerZone = zone;
-      _registerPitchClass = 0;
-    });
-    unawaited(_notePlayer.play([frequencyForPitchClass(0, zone)]));
+    setState(() => _registerZone = zone);
+    // Shorter than the 500 ms step so each note finishes before the next.
+    unawaited(
+      _notePlayer.play(
+        [frequencyForPitchClass(_registerPitchClass, zone)],
+        duration: const Duration(milliseconds: 450),
+      ),
+    );
     final done = zone >= kMaxZone;
     _registerTimer = Timer(const Duration(milliseconds: 500), () {
       if (token != _registerToken) return;
@@ -998,9 +1060,10 @@ class _HomePageState extends State<HomePage> {
                 _HomeTab.metronome => MetronomePanel(
                     bpm: _bpm,
                     onBpmChanged: _setBpm,
+                    onBeatsPerBarChanged: _setBeatsPerBar,
                     playing: _metronomeOn,
                     beat: _beat,
-                    beatsPerBar: 4,
+                    beatsPerBar: _beatsPerBar,
                     onToggle: _toggleMetronome,
                     pitchClass: _registerPitchClass,
                     onPitchClassChanged: (pitchClass) {
@@ -1017,21 +1080,6 @@ class _HomePageState extends State<HomePage> {
                     onPlayNote: _playRegisterNote,
                     onToggleLoop: _toggleRegisterLoop,
                     onSweep: _sweepRegister,
-                    scale: scale,
-                    keySelector: _KeySelector(
-                      value: _key,
-                      onChanged: (key) {
-                        _stopRegister();
-                        setState(() => _key = key);
-                      },
-                    ),
-                    scaleSelector: _ScaleSelector(
-                      value: _scaleType,
-                      onChanged: (type) {
-                        _stopRegister();
-                        setState(() => _scaleType = type);
-                      },
-                    ),
                   ),
                 _HomeTab.chords => ChordBuilderPanel(
                     notes: _builderNotes,
@@ -1187,6 +1235,10 @@ class _HomePageState extends State<HomePage> {
 
   NavigationRail get _navigationRail => NavigationRail(
     selectedIndex: _tab.index,
+    // Show the label under each icon on tablets and desktops, where there is
+    // room for it; [minWidth] keeps the longest label from clipping.
+    labelType: NavigationRailLabelType.all,
+    minWidth: 88,
     onDestinationSelected: (index) => _selectTab(_HomeTab.values[index]),
     destinations: [
       for (final tab in _HomeTab.values)

@@ -14,6 +14,15 @@ void main() {
     });
   });
 
+  group('tempoName', () {
+    test('names the traditional tempo bands', () {
+      expect(tempoName(kMinBpm), 'Largo');
+      expect(tempoName(90), 'Andante');
+      expect(tempoName(140), 'Allegro');
+      expect(tempoName(kMaxBpm), 'Prestissimo');
+    });
+  });
+
   group('register pitches', () {
     test('computes MIDI numbers and frequencies', () {
       expect(midiForPitchClass(0, 4), 60);

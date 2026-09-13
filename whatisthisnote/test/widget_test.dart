@@ -6,6 +6,7 @@ import 'package:whatisthisnote/audio/note_player.dart';
 import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/display_preferences.dart';
+import 'package:whatisthisnote/core/metronome.dart';
 import 'package:whatisthisnote/core/display_preferences_store.dart';
 import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
@@ -58,6 +59,14 @@ void main() {
 
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+    // The rail spells the destination out under its icon.
+    expect(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Metronome'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the metronome tempo can be changed', (tester) async {
@@ -72,6 +81,12 @@ void main() {
     await tester.tap(find.byKey(const Key('bpm-down')));
     await tester.pump();
     expect(tester.widget<Text>(find.byKey(const Key('bpm-value'))).data, '90');
+    await tester.tap(find.byKey(const Key('bpm-up-10')));
+    await tester.pump();
+    expect(tester.widget<Text>(find.byKey(const Key('bpm-value'))).data, '100');
+    await tester.tap(find.byKey(const Key('bpm-down-10')));
+    await tester.pump();
+    expect(tester.widget<Text>(find.byKey(const Key('bpm-value'))).data, '90');
   });
 
   testWidgets('the metronome click starts and stops', (tester) async {
@@ -80,12 +95,65 @@ void main() {
     await tester.tap(find.byTooltip('Metronome'));
     await tester.pumpAndSettle();
 
+    Color dotColor(int beat) =>
+        (tester
+                    .widget<AnimatedContainer>(
+                      find.byKey(Key('metronome-beat-$beat')),
+                    )
+                    .decoration!
+                as BoxDecoration)
+            .color!;
+
     await tester.tap(find.byKey(const Key('metronome-toggle')));
     await tester.pump();
-    expect(player.played, hasLength(1));
+    // The click is one looping bar; the dots follow it on their own clock.
+    expect(player.clickTracks, hasLength(1));
+    expect(player.clickTracks.single.beat, beatInterval(90));
+    expect(player.clickTracks.single.clicks, [1318.51, 880.0, 880.0, 880.0]);
 
+    final accent = dotColor(0);
+    expect(dotColor(0), isNot(dotColor(1)));
     await tester.pump(const Duration(milliseconds: 700));
-    expect(player.played.length, greaterThan(1));
+    expect(dotColor(1), accent);
+
+    await tester.tap(find.byKey(const Key('metronome-toggle')));
+    await tester.pumpAndSettle();
+    expect(player.clickStops, 1);
+  });
+
+  testWidgets('changing the tempo restarts the click track', (tester) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(find.byTooltip('Metronome'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('metronome-toggle')));
+    await tester.pump();
+    expect(player.clickTracks, hasLength(1));
+
+    await tester.tap(find.byKey(const Key('bpm-up-10')));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(player.clickTracks, hasLength(2));
+    expect(player.clickTracks.last.beat, beatInterval(100));
+
+    await tester.tap(find.byKey(const Key('metronome-toggle')));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the time signature changes the length of the bar', (
+    tester,
+  ) async {
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(find.byTooltip('Metronome'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('3/4'));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('metronome-toggle')));
+    await tester.pump();
+    expect(player.clickTracks.single.clicks, [1318.51, 880.0, 880.0]);
+    expect(find.byKey(const Key('metronome-beat-3')), findsNothing);
 
     await tester.tap(find.byKey(const Key('metronome-toggle')));
     await tester.pumpAndSettle();
@@ -100,15 +168,52 @@ void main() {
     await tester.pumpAndSettle();
 
     // The finder opens on C4.
+    await tester.ensureVisible(find.byKey(const Key('register-play')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('register-play')));
     await tester.pump();
     expect(player.played.single.single, closeTo(261.6256, 0.01));
 
+    await tester.ensureVisible(find.byKey(const Key('register-zone-5')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('register-zone-5')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('register-play')));
     await tester.pump();
     expect(player.played.last.single, closeTo(523.2511, 0.01));
+  });
+
+  testWidgets('the sweep walks the selected note across the zones', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(find.byTooltip('Metronome'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('register-note-2'))); // D
+    await tester.pump();
+    player.played.clear();
+
+    await tester.ensureVisible(find.byKey(const Key('register-sweep')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('register-sweep')));
+    await tester.pump();
+    expect(
+      player.played.single.single,
+      closeTo(frequencyForPitchClass(2, kMinZone), 0.01),
+    );
+
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      player.played.last.single,
+      closeTo(frequencyForPitchClass(2, kMinZone + 1), 0.01),
+    );
+
+    await tester.tap(find.byKey(const Key('register-sweep')));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('the chord builder names the notes it is given', (tester) async {
@@ -1302,10 +1407,22 @@ double _paintedStep(WidgetTester tester) {
 
 class _RecordingNotePlayer implements NotePlayer {
   final List<List<double>> played = [];
+  final List<({List<double> clicks, Duration beat})> clickTracks = [];
+  int clickStops = 0;
 
   @override
   Future<void> play(Iterable<double> frequencies, {Duration? duration}) async {
     played.add(frequencies.toList(growable: false));
+  }
+
+  @override
+  Future<void> startClickTrack(List<double> clicks, Duration beat) async {
+    clickTracks.add((clicks: clicks.toList(growable: false), beat: beat));
+  }
+
+  @override
+  Future<void> stopClickTrack() async {
+    clickStops++;
   }
 
   @override
