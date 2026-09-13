@@ -26,6 +26,43 @@ void main() {
     expect(tester.widget<Text>(find.byKey(const Key('note-degree'))).data, '7');
   });
 
+  testWidgets('the destinations switch between tabs', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    expect(find.byKey(const Key('controls')), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Metronome'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('coming-soon-title')))
+          .data,
+      'Metronome',
+    );
+
+    await tester.tap(find.byTooltip('Chords'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('coming-soon-title')))
+          .data,
+      'Chords',
+    );
+
+    await tester.tap(find.byTooltip('Note'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('controls')), findsOneWidget);
+  });
+
+  testWidgets('wide windows use a navigation rail', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+  });
+
   testWidgets('shows a piano keyboard for the current note', (tester) async {
     await tester.pumpWidget(const WhatIsThisNoteApp());
 
@@ -243,6 +280,7 @@ void main() {
     await tester.tap(find.text('Ninths').last);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('progression-label')));
     await tester.tap(find.byKey(const Key('progression-label')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(kProgressions.first.name).last);
@@ -564,7 +602,9 @@ void main() {
 
     expect(find.byKey(const Key('guided-panel')), findsNothing);
 
-    await tester.tap(find.byTooltip('Guided path'));
+    await tester.tap(find.byTooltip('Practice'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Guided path'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('guided-panel')), findsOneWidget);
@@ -588,7 +628,9 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const WhatIsThisNoteApp());
-    await tester.tap(find.byTooltip('Guided path'));
+    await tester.tap(find.byTooltip('Practice'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Guided path'));
     await tester.pumpAndSettle();
 
     // Three explanation steps, then the first practice step.
@@ -715,11 +757,13 @@ void main() {
     await tester.tap(find.text('Triads').last);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('progression-label')));
     await tester.tap(find.byKey(const Key('progression-label')));
     await tester.pumpAndSettle();
     await tester.tap(find.text(kProgressions.first.name).last);
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('play-progression')));
     await tester.tap(find.byKey(const Key('play-progression')));
     await tester.pump();
 
@@ -934,7 +978,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the controls fit without scrolling on a typical window', (
+  testWidgets('a small window scrolls the controls to grow the staff', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(400, 800));
@@ -942,6 +986,7 @@ void main() {
     await tester.pumpWidget(const WhatIsThisNoteApp());
     await tester.pumpAndSettle();
 
+    // The panel scrolls instead of squeezing the notation into a thin strip.
     final controls = find.byKey(const Key('controls'));
     final scrollable = find.descendant(
       of: controls,
@@ -949,11 +994,17 @@ void main() {
     );
     expect(
       tester.state<ScrollableState>(scrollable).position.maxScrollExtent,
-      0,
-      reason: 'the controls panel should not need to scroll',
+      greaterThan(0),
+      reason: 'the controls should scroll to leave the staff more room',
     );
 
     final baseline = tester.getSize(find.byType(StaffView)).height;
+    expect(
+      baseline,
+      greaterThan(tester.getSize(controls).height * 0.5),
+      reason: 'the staff should get the larger share of a small window',
+    );
+
     for (var i = 0; i < 12; i++) {
       await tester.dragFrom(
         tester.getRect(find.byType(StaffView)).center,

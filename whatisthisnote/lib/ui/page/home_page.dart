@@ -26,6 +26,29 @@ enum _Playback { highlight, progression }
 const Duration _sequenceNoteDuration = Duration(milliseconds: 340);
 const Duration _sequenceStepGap = Duration(milliseconds: 420);
 
+/// Window width at or above which the destinations move to a left rail; below
+/// it they are a bottom bar, so phones keep their width for the staff.
+const double _navRailBreakpoint = 900;
+
+/// Top-level destinations of the app.
+enum _HomeTab { note, practice, metronome, chords }
+
+extension on _HomeTab {
+  String get label => switch (this) {
+    _HomeTab.note => 'Note',
+    _HomeTab.practice => 'Practice',
+    _HomeTab.metronome => 'Metronome',
+    _HomeTab.chords => 'Chords',
+  };
+
+  IconData get icon => switch (this) {
+    _HomeTab.note => Icons.music_note,
+    _HomeTab.practice => Icons.quiz,
+    _HomeTab.metronome => Icons.av_timer,
+    _HomeTab.chords => Icons.queue_music,
+  };
+}
+
 /// The main screen: an interactive staff plus controls for the clef, the key,
 /// an optional scale highlight, the note position and the theme.
 class HomePage extends StatefulWidget {
@@ -90,6 +113,9 @@ class _HomePageState extends State<HomePage> {
 
   /// Middle line of the treble staff (B4).
   int _step = 4;
+
+  /// The destination currently shown.
+  _HomeTab _tab = _HomeTab.note;
 
   /// Width of the wide-layout controls rail, dragged by the user.
   double _sidebarWidth = 380;
@@ -406,6 +432,22 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  /// Switches the top-level destination. Leaving Practice clears its mode so
+  /// the quiz cannot outlive a staff the learner changed on another tab.
+  void _selectTab(_HomeTab tab) {
+    if (tab == _tab) return;
+    if (_playback != null) _stopSequence();
+    final startPractice = tab == _HomeTab.practice && !_practice && !_guided;
+    setState(() {
+      _tab = tab;
+      if (tab != _HomeTab.practice) {
+        _practice = false;
+        _guided = false;
+      }
+    });
+    if (startPractice) _startPractice();
+  }
+
   void _startGuided() {
     if (_playback != null) _stopSequence();
     setState(() {
@@ -419,7 +461,10 @@ class _HomePageState extends State<HomePage> {
 
   void _exitGuided() {
     if (_playback != null) _stopSequence();
-    setState(() => _guided = false);
+    setState(() {
+      _guided = false;
+      _tab = _HomeTab.note;
+    });
   }
 
   /// Enters practice mode: a separate mode that hides the answer and quizzes
@@ -443,7 +488,10 @@ class _HomePageState extends State<HomePage> {
 
   void _exitPractice() {
     if (_playback != null) _stopSequence();
-    setState(() => _practice = false);
+    setState(() {
+      _practice = false;
+      _tab = _HomeTab.note;
+    });
   }
 
   void _nextPracticeQuestion() {
@@ -517,6 +565,8 @@ class _HomePageState extends State<HomePage> {
     final chordScale = _chordScale(scale);
     final note = _key.applyTo(_clef.noteAt(_step));
     final chord = _chordFor(chordScale, note);
+    final practiceActive = _tab == _HomeTab.practice && _practice;
+    final guidedActive = _tab == _HomeTab.practice && _guided;
     int? playingPitchClass;
     var playingUpperOctave = false;
     if (_playback == _Playback.highlight &&
@@ -544,59 +594,18 @@ class _HomePageState extends State<HomePage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          actions: [
-            IconButton(
-              tooltip: 'Practice',
-              isSelected: _practice,
-              icon: const Icon(Icons.quiz),
-              onPressed: _practice ? _exitPractice : _startPractice,
-            ),
-            IconButton(
-              tooltip: 'Guided path',
-              isSelected: _guided,
-              icon: const Icon(Icons.school),
-              onPressed: _guided ? _exitGuided : _startGuided,
-            ),
-            IconButton(
-              key: const Key('display-settings'),
-              tooltip: 'Display',
-              icon: const Icon(Icons.tune),
-              onPressed: _openDisplaySettings,
-            ),
-            PopupMenuButton<ThemeMode>(
-              tooltip: 'Theme',
-              icon: Icon(_themeIcon(widget.themeMode)),
-              initialValue: widget.themeMode,
-              onSelected: widget.onThemeModeChanged,
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: ThemeMode.system,
-                  child: _ThemeOption(
-                    icon: Icons.brightness_auto,
-                    label: 'System',
-                  ),
-                ),
-                PopupMenuItem(
-                  value: ThemeMode.light,
-                  child: _ThemeOption(icon: Icons.light_mode, label: 'Light'),
-                ),
-                PopupMenuItem(
-                  value: ThemeMode.dark,
-                  child: _ThemeOption(icon: Icons.dark_mode, label: 'Dark'),
-                ),
-              ],
-            ),
-          ],
+          actions: _tab == _HomeTab.note ? _appBarActions : null,
         ),
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
               // On a wide window the controls move into a right-hand rail so
               // the staff can use the full height instead of being squeezed
-              // above a full-width control panel. Guided and practice are
-              // focused modes and stay at the bottom even when wide.
+              // above a full-width control panel. Practice is a focused mode
+              // and stays at the bottom even when wide. The same window width
+              // decides whether the destinations are a rail or a bottom bar.
               final sidebar = constraints.maxWidth >= 900;
-              final modePanel = _guided || (_practice && _question != null);
+              final modePanel = _tab == _HomeTab.practice;
 
               final staff = Stack(
                 fit: StackFit.expand,
@@ -606,14 +615,14 @@ class _HomePageState extends State<HomePage> {
                     keySignature: _key,
                     step: _step,
                     chordSteps: chord?.staffSteps(_step) ?? const [],
-                    targetStep: _guidedTarget,
+                    targetStep: guidedActive ? _guidedTarget : null,
                     showLabel:
                         widget.display.showStaffLabel &&
-                        (!_practice || _answered != null),
-                    interactive: !_practice,
+                        (!practiceActive || _answered != null),
+                    interactive: !practiceActive,
                     naming: widget.display.naming,
                     showEnharmonic: widget.display.showEnharmonic,
-                    semanticValue: (!_practice || _answered != null)
+                    semanticValue: (!practiceActive || _answered != null)
                         ? note.name
                         : null,
                     onStepChanged: (step) {
@@ -622,7 +631,7 @@ class _HomePageState extends State<HomePage> {
                       setState(() => _step = step);
                     },
                   ),
-                  if (widget.showCoachMark && !_practice && !_guided)
+                  if (widget.showCoachMark && !practiceActive && !guidedActive)
                     Positioned(
                       left: 16,
                       right: 16,
@@ -634,96 +643,125 @@ class _HomePageState extends State<HomePage> {
                 ],
               );
 
-              final panel = _guided
-                  ? _GuidedPanel(
-                      key: const Key('guided-panel'),
-                      lesson: _lesson,
-                      step: _lessonStep,
-                      lessonIndex: _lessonIndex,
-                      stepIndex: _stepIndex,
-                      totalSteps: _totalSteps,
-                      completedSteps: _completedSteps,
-                      isLastStep: _isLastStep,
-                      matched: _practiceMatched,
-                      onBack: _previousLessonStep,
-                      onNext: _nextLessonStep,
-                      onExit: _exitGuided,
-                    )
-                  : (_practice && _question != null)
-                  ? _PracticePanel(
-                      key: const Key('practice-panel'),
-                      question: _question!,
-                      answered: _answered,
-                      attempts: _attempts,
-                      correctAnswers: _correctAnswers,
-                      streak: _streak,
-                      bestStreak: _bestStreak,
-                      onAnswer: _answerPractice,
-                      onNext: _nextPracticeQuestion,
-                      onReset: _resetPracticeScore,
-                      onExit: _exitPractice,
-                    )
-                  : _Controls(
-                      key: const Key('controls'),
-                      sidebar: sidebar,
-                      clef: _clef,
-                      keySignature: _key,
-                      display: widget.display,
-                      scale: scale,
-                      chord: chord,
-                      chordScale: chordScale,
-                      chordMode: _chordMode,
-                      inversion: chord?.inversion ?? 0,
-                      selectedQuality: _chordQuality,
-                      progression: _progression,
-                      step: _step,
-                      playingPitchClass: playingPitchClass,
-                      playingUpperOctave: playingUpperOctave,
-                      highlightPlaying: _playback == _Playback.highlight,
-                      progressionPlaying: _playback == _Playback.progression,
-                      activeProgressionIndex: _playback == _Playback.progression
-                          ? _playbackIndex
-                          : null,
-                      onPlay: _playNow,
-                      onPlayHighlight: () =>
-                          _toggleSequence(_Playback.highlight),
-                      onPlayProgression: () =>
-                          _toggleSequence(_Playback.progression),
-                      onClefChanged: (clef) {
-                        _stopSequence();
-                        setState(() => _clef = clef);
-                      },
-                      onKeyChanged: (key) {
-                        _stopSequence();
-                        setState(() => _key = key);
-                      },
-                      onScaleTypeChanged: (type) {
-                        _stopSequence();
-                        setState(() => _scaleType = type);
-                      },
-                      onChordModeChanged: _setChordMode,
-                      onQualitySelected: _selectChordQuality,
-                      onInversionChanged: (value) {
-                        _stopSequence();
-                        setState(() => _inversion = value);
-                      },
-                      onProgressionChanged: (value) {
-                        _stopSequence();
-                        setState(() => _progression = value);
-                      },
-                      onDegreeSelected: _moveToDegree,
-                      onStepChanged: (step) {
-                        _stopSequence();
-                        _setStep(step);
-                      },
-                    );
+              final panel = switch (_tab) {
+                _HomeTab.note => _Controls(
+                    key: const Key('controls'),
+                    sidebar: sidebar,
+                    clef: _clef,
+                    keySignature: _key,
+                    display: widget.display,
+                    scale: scale,
+                    chord: chord,
+                    chordScale: chordScale,
+                    chordMode: _chordMode,
+                    inversion: chord?.inversion ?? 0,
+                    selectedQuality: _chordQuality,
+                    progression: _progression,
+                    step: _step,
+                    playingPitchClass: playingPitchClass,
+                    playingUpperOctave: playingUpperOctave,
+                    highlightPlaying: _playback == _Playback.highlight,
+                    progressionPlaying: _playback == _Playback.progression,
+                    activeProgressionIndex: _playback == _Playback.progression
+                        ? _playbackIndex
+                        : null,
+                    onPlay: _playNow,
+                    onPlayHighlight: () =>
+                        _toggleSequence(_Playback.highlight),
+                    onPlayProgression: () =>
+                        _toggleSequence(_Playback.progression),
+                    onClefChanged: (clef) {
+                      _stopSequence();
+                      setState(() => _clef = clef);
+                    },
+                    onKeyChanged: (key) {
+                      _stopSequence();
+                      setState(() => _key = key);
+                    },
+                    onScaleTypeChanged: (type) {
+                      _stopSequence();
+                      setState(() => _scaleType = type);
+                    },
+                    onChordModeChanged: _setChordMode,
+                    onQualitySelected: _selectChordQuality,
+                    onInversionChanged: (value) {
+                      _stopSequence();
+                      setState(() => _inversion = value);
+                    },
+                    onProgressionChanged: (value) {
+                      _stopSequence();
+                      setState(() => _progression = value);
+                    },
+                    onDegreeSelected: _moveToDegree,
+                    onStepChanged: (step) {
+                      _stopSequence();
+                      _setStep(step);
+                    },
+                  ),
+                _HomeTab.practice => guidedActive
+                    ? _GuidedPanel(
+                        key: const Key('guided-panel'),
+                        lesson: _lesson,
+                        step: _lessonStep,
+                        lessonIndex: _lessonIndex,
+                        stepIndex: _stepIndex,
+                        totalSteps: _totalSteps,
+                        completedSteps: _completedSteps,
+                        isLastStep: _isLastStep,
+                        matched: _practiceMatched,
+                        onBack: _previousLessonStep,
+                        onNext: _nextLessonStep,
+                        onExit: _exitGuided,
+                      )
+                    : _question == null
+                    ? const SizedBox.shrink()
+                    : _PracticePanel(
+                        key: const Key('practice-panel'),
+                        question: _question!,
+                        answered: _answered,
+                        attempts: _attempts,
+                        correctAnswers: _correctAnswers,
+                        streak: _streak,
+                        bestStreak: _bestStreak,
+                        onAnswer: _answerPractice,
+                        onNext: _nextPracticeQuestion,
+                        onReset: _resetPracticeScore,
+                        onExit: _exitPractice,
+                      ),
+                _HomeTab.metronome => const _ComingSoon(
+                    icon: Icons.av_timer,
+                    title: 'Metronome',
+                    message:
+                        'A metronome that also locates the register: hold a '
+                        'fixed note, or sweep C1 to C8 to feel the zones, then '
+                        'walk the notes to name the pitch. Fill it in with any '
+                        'scale.',
+                  ),
+                _HomeTab.chords => const _ComingSoon(
+                    icon: Icons.queue_music,
+                    title: 'Chords',
+                    message:
+                        'Stack up to eight notes and hear every chord they '
+                        'could make, with the closest match when they make '
+                        'none. Place a note, adjust it, then decide what the '
+                        'sound is.',
+                  ),
+              };
+
+              if (_tab == _HomeTab.metronome || _tab == _HomeTab.chords) {
+                return _withNavigation(constraints.maxWidth, panel);
+              }
 
               if (!sidebar || modePanel) {
-                return Column(
-                  children: [
-                    Expanded(child: staff),
-                    panel,
-                  ],
+                return _withNavigation(
+                  constraints.maxWidth,
+                  Column(
+                    children: [
+                      if (modePanel) _practiceModeToggle,
+                      Expanded(child: staff),
+                      panel,
+                    ],
+                  ),
                 );
               }
 
@@ -733,20 +771,23 @@ class _HomePageState extends State<HomePage> {
               );
               final sidebarWidth = _sidebarWidth.clamp(280.0, maxSidebarWidth);
 
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(child: staff),
-                  _SidebarResizer(
-                    onDrag: (dx) => setState(() {
-                      _sidebarWidth = (_sidebarWidth - dx).clamp(
-                        280.0,
-                        maxSidebarWidth,
-                      );
-                    }),
-                  ),
-                  SizedBox(width: sidebarWidth, child: panel),
-                ],
+              return _withNavigation(
+                constraints.maxWidth,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: staff),
+                    _SidebarResizer(
+                      onDrag: (dx) => setState(() {
+                        _sidebarWidth = (_sidebarWidth - dx).clamp(
+                          280.0,
+                          maxSidebarWidth,
+                        );
+                      }),
+                    ),
+                    SizedBox(width: sidebarWidth, child: panel),
+                  ],
+                ),
               );
             },
           ),
@@ -754,6 +795,107 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  /// Wraps a destination's [content] with the right navigation for the window:
+  /// a rail on the left when wide, a bottom bar on phones.
+  Widget _withNavigation(double width, Widget content) {
+    if (width >= _navRailBreakpoint) {
+      return Row(
+        children: [
+          _navigationRail,
+          const VerticalDivider(width: 1),
+          Expanded(child: content),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        Expanded(child: content),
+        _navigationBar,
+      ],
+    );
+  }
+
+  List<Widget> get _appBarActions => [
+    IconButton(
+      key: const Key('display-settings'),
+      tooltip: 'Display',
+      icon: const Icon(Icons.tune),
+      onPressed: _openDisplaySettings,
+    ),
+    PopupMenuButton<ThemeMode>(
+      tooltip: 'Theme',
+      icon: Icon(_themeIcon(widget.themeMode)),
+      initialValue: widget.themeMode,
+      onSelected: widget.onThemeModeChanged,
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: ThemeMode.system,
+          child: _ThemeOption(icon: Icons.brightness_auto, label: 'System'),
+        ),
+        PopupMenuItem(
+          value: ThemeMode.light,
+          child: _ThemeOption(icon: Icons.light_mode, label: 'Light'),
+        ),
+        PopupMenuItem(
+          value: ThemeMode.dark,
+          child: _ThemeOption(icon: Icons.dark_mode, label: 'Dark'),
+        ),
+      ],
+    ),
+  ];
+
+  /// The Practice / Guided path switch shown above the practice tab.
+  Widget get _practiceModeToggle => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: SegmentedButton<bool>(
+        key: const Key('practice-mode-toggle'),
+        showSelectedIcon: false,
+        segments: const [
+          ButtonSegment(
+            value: false,
+            label: Text('Practice'),
+            icon: Icon(Icons.quiz),
+          ),
+          ButtonSegment(
+            value: true,
+            label: Text('Guided path'),
+            icon: Icon(Icons.school),
+          ),
+        ],
+        selected: {_guided},
+        onSelectionChanged: (selection) =>
+            selection.first ? _startGuided() : _startPractice(),
+      ),
+    ),
+  );
+
+  NavigationRail get _navigationRail => NavigationRail(
+    selectedIndex: _tab.index,
+    onDestinationSelected: (index) => _selectTab(_HomeTab.values[index]),
+    destinations: [
+      for (final tab in _HomeTab.values)
+        NavigationRailDestination(
+          icon: Icon(tab.icon),
+          label: Text(tab.label),
+        ),
+    ],
+  );
+
+  NavigationBar get _navigationBar => NavigationBar(
+    selectedIndex: _tab.index,
+    onDestinationSelected: (index) => _selectTab(_HomeTab.values[index]),
+    destinations: [
+      for (final tab in _HomeTab.values)
+        NavigationDestination(
+          icon: Icon(tab.icon),
+          label: tab.label,
+          tooltip: tab.label,
+        ),
+    ],
+  );
 
   IconData _themeIcon(ThemeMode mode) {
     switch (mode) {
@@ -1417,9 +1559,11 @@ class _Controls extends StatelessWidget {
 
     return ConstrainedBox(
       constraints: BoxConstraints(
+        // On phones the panel gives the staff the larger share and scrolls
+        // itself, so the notation never gets squeezed into a thin strip.
         maxHeight: sidebar
             ? double.infinity
-            : MediaQuery.sizeOf(context).height * 0.72,
+            : MediaQuery.sizeOf(context).height * 0.5,
       ),
       child: SingleChildScrollView(
         child: Padding(
@@ -2202,5 +2346,57 @@ class _ThemeOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [Icon(icon), const SizedBox(width: 12), Text(label)]);
+  }
+}
+
+/// A placeholder for a top-level destination whose feature is still to come.
+class _ComingSoon extends StatelessWidget {
+  const _ComingSoon({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 64, color: scheme.primary),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                key: const Key('coming-soon-title'),
+                style: theme.textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Chip(
+                avatar: Icon(Icons.construction, size: 18),
+                label: Text('Coming soon'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
