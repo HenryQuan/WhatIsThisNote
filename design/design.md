@@ -4,7 +4,9 @@
     * ShortLine
 
 We need to draw 5 long lines for the notation and extra short lines if the note is too high or too low. 
-Line needs to provide functions to get x value and do some basic calculations. 
+Line needs to provide functions to get x value and do some basic calculations.
+
+The core idea for the entire app is that the user can interact with the staff and note by dragging or using keyword (up or down arrow). No input typing anywhere, unless the app supports connecting to a keyboard. Then, we can tell the user which keys they are pressing. This is the core, even if it is a good feature, we can't sacrifice the UX for it. The main focus is always telling the note or chord. Don't do anthing else.
 
 # Drawing notes
 What should be used? Maybe some images?
@@ -44,8 +46,7 @@ It should be really smooth and the note should snap to the closest position. The
    `OnboardingStore` that tests replace with an in-memory fake. The card body
    ignores pointers so it never blocks the drag it is teaching; only its
    "Got it" button takes taps.
-5. Guided-path feedback: "higher/lower" hint on wrong drags, remember
-   progress, "practice again".
+5. Guided path feedback: it is good as it is, no further improvement needed.
 6. Accessibility & pro conveniences. Done: the staff is a labelled Semantics
    node whose value is the note (null while practising so the answer is not
    announced), with increase/decrease actions and matching

@@ -840,6 +840,9 @@ class _CoachMark extends StatelessWidget {
               child: TextButton(
                 key: const Key('onboarding-dismiss'),
                 onPressed: onDismiss,
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onInverseSurface,
+                ),
                 child: const Text('Got it'),
               ),
             ),
@@ -2126,7 +2129,6 @@ class _ChordReadout extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
