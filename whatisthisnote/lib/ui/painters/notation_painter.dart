@@ -11,6 +11,11 @@ import '../../core/note.dart';
 import '../../core/staff_geometry.dart';
 import '../notation_glyphs.dart';
 
+/// Default solfege spelling for the on-staff label. UI code swaps this out for
+/// a localized resolver; the plain English/Italian names keep the painter
+/// usable on its own (for example in tests).
+String _defaultSolfegeName(Note note) => note.solfege;
+
 /// Paints a five line staff, a clef, the key signature, the ledger lines
 /// required by the current note and the note itself (with stem). Also paints a
 /// small label next to the note showing its scientific and solfege names.
@@ -28,6 +33,7 @@ class NotationPainter extends CustomPainter {
     required this.showLabel,
     this.naming = NamingSystem.scientific,
     this.showEnharmonic = false,
+    this.solfegeName = _defaultSolfegeName,
     this.chordSteps = const [],
     this.chordColor = const Color(0xFF000000),
     this.targetStep,
@@ -60,6 +66,10 @@ class NotationPainter extends CustomPainter {
   /// is appended.
   final NamingSystem naming;
   final bool showEnharmonic;
+
+  /// Localized spelling of a note's fixed-do solfege name, used when [naming]
+  /// is [NamingSystem.solfege].
+  final String Function(Note note) solfegeName;
 
   /// Staff steps of the current chord, low to high. Empty for a single note.
   final List<int> chordSteps;
@@ -121,7 +131,7 @@ class NotationPainter extends CustomPainter {
       case NamingSystem.scientific:
         return note.pitchName;
       case NamingSystem.solfege:
-        return note.solfege;
+        return solfegeName(note);
       case NamingSystem.jianpu:
         return key.jianpuFor(note);
     }

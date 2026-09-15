@@ -6,6 +6,7 @@ import 'audio/note_player.dart';
 import 'core/display_preferences.dart';
 import 'core/display_preferences_store.dart';
 import 'core/onboarding.dart';
+import 'l10n/app_localizations.dart';
 import 'ui/page/home_page.dart';
 import 'ui/theme.dart';
 import 'ui/widgets/about_panel.dart';
@@ -91,11 +92,14 @@ class _WhatIsThisNoteAppState extends State<WhatIsThisNoteApp> {
         final dynamicLight = _useDynamicColor ? lightDynamic : null;
         final dynamicDark = _useDynamicColor ? darkDynamic : null;
         return MaterialApp(
-          title: 'WhatIsThisNote',
+          onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light(dynamicLight),
           darkTheme: AppTheme.dark(dynamicDark),
           themeMode: _themeMode,
+          locale: _display.language.locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: HomePage(
             themeMode: _themeMode,
             onThemeModeChanged: (mode) => setState(() => _themeMode = mode),

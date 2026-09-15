@@ -15,6 +15,8 @@ class PianoKeyboard extends StatelessWidget {
     this.highlightPitchClasses,
     this.chordPitchClasses,
     this.chordMidis,
+    this.suggestedPitchClasses,
+    this.chordLabels,
     this.midiUpperOctave = false,
     this.playingPitchClass,
     this.playingUpperOctave = false,
@@ -39,6 +41,17 @@ class PianoKeyboard extends StatelessWidget {
   /// precedence over [chordPitchClasses] so an upper-octave C lights the upper
   /// C key instead of the lower one. The keyboard spans C4-C5 (MIDI 60-72).
   final Set<int>? chordMidis;
+
+  /// Pitch classes (0 == C) of a chord's ideal tones, outlined rather than
+  /// filled. Used by the chord builder to show the notes of the closest chord
+  /// so the learner can see which keys to add; keys that are already part of
+  /// the chord stay solid.
+  final Set<int>? suggestedPitchClasses;
+
+  /// Note names (0 == C) to write on the chord keys, e.g. `{0: 'C', 4: 'E',
+  /// 7: 'G', 11: 'B'}` for Cmaj7. Only drawn on keys that are part of the
+  /// chord or one of the [suggestedPitchClasses].
+  final Map<int, String>? chordLabels;
 
   /// Whether [midi]'s key is the upper of the keyboard's two C keys, used when
   /// the highlighted note is a C in the upper octave.
@@ -76,6 +89,8 @@ class PianoKeyboard extends StatelessWidget {
         highlightPitchClasses: highlightPitchClasses,
         chordPitchClasses: chordPitchClasses,
         chordMidis: chordMidis,
+        suggestedPitchClasses: suggestedPitchClasses,
+        chordLabels: chordLabels,
         playingPitchClass: playingPitchClass,
         playingUpperOctave: playingUpperOctave,
         whiteColor: scheme.surfaceContainerLowest,
@@ -84,6 +99,8 @@ class PianoKeyboard extends StatelessWidget {
         highlightColor: scheme.primary,
         scaleColor: scheme.primaryContainer,
         chordColor: scheme.tertiary,
+        suggestedColor: scheme.tertiary,
+        onChordColor: scheme.onTertiary,
         playingColor: scheme.secondary,
         onHighlightColor: scheme.onPrimary,
         highlightBlackColor: Color.alphaBlend(
@@ -136,6 +153,8 @@ class _PianoKeyboardPainter extends CustomPainter {
     required this.highlightPitchClasses,
     required this.chordPitchClasses,
     required this.chordMidis,
+    required this.suggestedPitchClasses,
+    required this.chordLabels,
     required this.playingPitchClass,
     required this.playingUpperOctave,
     required this.whiteColor,
@@ -144,6 +163,8 @@ class _PianoKeyboardPainter extends CustomPainter {
     required this.highlightColor,
     required this.scaleColor,
     required this.chordColor,
+    required this.suggestedColor,
+    required this.onChordColor,
     required this.playingColor,
     required this.onHighlightColor,
     required this.highlightBlackColor,
@@ -159,6 +180,8 @@ class _PianoKeyboardPainter extends CustomPainter {
   final Set<int>? highlightPitchClasses;
   final Set<int>? chordPitchClasses;
   final Set<int>? chordMidis;
+  final Set<int>? suggestedPitchClasses;
+  final Map<int, String>? chordLabels;
   final int? playingPitchClass;
   final bool playingUpperOctave;
   final Color whiteColor;
@@ -167,6 +190,8 @@ class _PianoKeyboardPainter extends CustomPainter {
   final Color highlightColor;
   final Color scaleColor;
   final Color chordColor;
+  final Color suggestedColor;
+  final Color onChordColor;
   final Color playingColor;
   final Color onHighlightColor;
 
@@ -265,6 +290,12 @@ class _PianoKeyboardPainter extends CustomPainter {
           ? chordMidis!.contains(_baseMidi + _whiteOffsets[i])
           : !isUpperC &&
                 (chordPitchClasses?.contains(whitePitchClass) ?? false);
+      final suggested =
+          !isUpperC &&
+          (suggestedPitchClasses?.contains(whitePitchClass) ?? false);
+      final chordLabel = (inChord || suggested)
+          ? (chordLabels?[whitePitchClass])
+          : null;
       final playing =
           playingPitchClass == whitePitchClass &&
           (whitePitchClass != 0 || (i == 7) == playingUpperOctave);
@@ -283,6 +314,18 @@ class _PianoKeyboardPainter extends CustomPainter {
               : whiteColor,
       );
       canvas.drawRRect(rrect, border);
+      if (suggested && !inChord && !playing && !highlighted) {
+        _paintSuggestionOutline(canvas, rect, const Radius.circular(4), 3.5);
+      }
+      if (chordLabel != null && !playing && !(highlighted && label != null)) {
+        _paintKeyLabel(
+          canvas,
+          rect,
+          chordLabel,
+          inChord ? onChordColor : suggestedColor,
+          whiteWidth,
+        );
+      }
       if (highlighted && label != null) {
         _paintLabel(canvas, rect, onHighlightColor, whiteWidth * 0.5);
       }
@@ -300,6 +343,10 @@ class _PianoKeyboardPainter extends CustomPainter {
       final inChord = chordMidis != null
           ? chordMidis!.contains(_baseMidi + entry.key)
           : (chordPitchClasses?.contains(entry.key) ?? false);
+      final suggested = suggestedPitchClasses?.contains(entry.key) ?? false;
+      final chordLabel = (inChord || suggested)
+          ? (chordLabels?[entry.key])
+          : null;
       final playing = playingPitchClass == entry.key;
       final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(3));
       canvas.drawRRect(
@@ -315,10 +362,68 @@ class _PianoKeyboardPainter extends CustomPainter {
               ? scaleBlackColor
               : blackColor,
       );
+      if (suggested && !inChord && !playing && !highlighted) {
+        _paintSuggestionOutline(canvas, rect, const Radius.circular(2), 2.5);
+      }
+      if (chordLabel != null && !playing && !(highlighted && label != null)) {
+        _paintKeyLabel(
+          canvas,
+          rect,
+          chordLabel,
+          inChord ? onChordColor : suggestedColor,
+          whiteWidth,
+        );
+      }
       if (highlighted && label != null) {
         _paintLabel(canvas, rect, onHighlightColor, blackWidth * 0.7);
       }
     }
+  }
+
+  /// Draws the inner outline that marks a suggested chord tone: a key the
+  /// closest chord needs but the learner has not stacked yet.
+  void _paintSuggestionOutline(
+    Canvas canvas,
+    Rect rect,
+    Radius radius,
+    double inset,
+  ) {
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(inset), radius),
+      Paint()
+        ..color = suggestedColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5,
+    );
+  }
+
+  /// Writes a chord tone's name near the bottom of its key. The font shrinks
+  /// with the key so a full name still fits on a narrow key.
+  void _paintKeyLabel(
+    Canvas canvas,
+    Rect rect,
+    String text,
+    Color color,
+    double keyWidth,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          color: color,
+          fontSize: (keyWidth * 0.32).clamp(8.0, 13.0),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(
+      canvas,
+      Offset(
+        rect.center.dx - painter.width / 2,
+        rect.bottom - painter.height - 3,
+      ),
+    );
   }
 
   void _paintLabel(Canvas canvas, Rect rect, Color color, double maxFontSize) {
@@ -351,6 +456,8 @@ class _PianoKeyboardPainter extends CustomPainter {
         !setEquals(old.highlightPitchClasses, highlightPitchClasses) ||
         !setEquals(old.chordPitchClasses, chordPitchClasses) ||
         !setEquals(old.chordMidis, chordMidis) ||
+        !setEquals(old.suggestedPitchClasses, suggestedPitchClasses) ||
+        !mapEquals(old.chordLabels, chordLabels) ||
         old.playingPitchClass != playingPitchClass ||
         old.playingUpperOctave != playingUpperOctave ||
         old.whiteColor != whiteColor ||
@@ -359,6 +466,8 @@ class _PianoKeyboardPainter extends CustomPainter {
         old.highlightColor != highlightColor ||
         old.scaleColor != scaleColor ||
         old.chordColor != chordColor ||
+        old.suggestedColor != suggestedColor ||
+        old.onChordColor != onChordColor ||
         old.playingColor != playingColor ||
         old.highlightBlackColor != highlightBlackColor ||
         old.scaleBlackColor != scaleBlackColor ||

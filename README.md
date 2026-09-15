@@ -32,6 +32,10 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 - [x] Mini piano keyboard showing which key the note is on
 - [x] Hear the note, or the current chord, with a built-in synthesizer (no audio assets)
 - [x] Treble, bass and alto clefs
+- [x] Localized into eight languages plus English (Simplified and Traditional
+      Chinese, Japanese, Korean, Spanish, French, German and Portuguese). The
+      language follows the system by default and can be changed in About,
+      where the choice is saved between sessions
 - [x] Responsive layout (line spacing scales with the screen)
 - [x] Light and dark themes
 

@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_language.dart';
 import 'display_preferences.dart';
 
 /// Loads and saves the user's [DisplayPreferences].
@@ -16,6 +17,7 @@ class SharedPreferencesDisplayPreferencesStore
   static const String _namingKey = 'display_naming';
   static const String _staffLabelKey = 'display_show_staff_label';
   static const String _enharmonicKey = 'display_show_enharmonic';
+  static const String _languageKey = 'display_language';
 
   @override
   Future<DisplayPreferences> load() async {
@@ -24,6 +26,7 @@ class SharedPreferencesDisplayPreferencesStore
       naming: _namingFromName(preferences.getString(_namingKey)),
       showStaffLabel: preferences.getBool(_staffLabelKey) ?? true,
       showEnharmonic: preferences.getBool(_enharmonicKey) ?? false,
+      language: _languageFromName(preferences.getString(_languageKey)),
     );
   }
 
@@ -33,6 +36,7 @@ class SharedPreferencesDisplayPreferencesStore
     await store.setString(_namingKey, preferences.naming.name);
     await store.setBool(_staffLabelKey, preferences.showStaffLabel);
     await store.setBool(_enharmonicKey, preferences.showEnharmonic);
+    await store.setString(_languageKey, preferences.language.name);
   }
 }
 
@@ -43,6 +47,15 @@ NamingSystem _namingFromName(String? name) {
     if (system.name == name) return system;
   }
   return NamingSystem.scientific;
+}
+
+/// Resolves a stored language name, falling back to the system language for
+/// missing or unknown values.
+AppLanguage _languageFromName(String? name) {
+  for (final language in AppLanguage.values) {
+    if (language.name == name) return language;
+  }
+  return AppLanguage.system;
 }
 
 /// In-memory store used by tests and as a safe default when no platform

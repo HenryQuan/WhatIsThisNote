@@ -30,6 +30,9 @@
 .pub/
 /build/
 
+# Generated localizations (rebuild with `flutter gen-l10n`; see l10n.yaml)
+lib/l10n/app_localizations*.dart
+
 # Web related
 
 # Symbolication related

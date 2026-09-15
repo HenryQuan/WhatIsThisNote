@@ -1,0 +1,453 @@
+{
+  "@@locale": "en",
+
+  "appName": "WhatIsThisNote",
+  "appTitle": "What is this note?",
+  "aboutTagline": "Learn to read music by dragging a note around the staff. Ledger lines, key signatures and note names update as you go.",
+  "versionLabel": "Version {version}",
+  "@versionLabel": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+
+  "tabNote": "Note",
+  "tabPractice": "Practice",
+  "tabMetronome": "Metronome",
+  "tabChords": "Chords",
+  "tabAbout": "About",
+
+  "modePractice": "Practice",
+  "modePlay": "Play",
+  "modeGuide": "Guide",
+  "play": "Play",
+  "back": "Back",
+  "next": "Next",
+  "finish": "Finish",
+  "reset": "Reset",
+  "nextNote": "Next note",
+  "off": "Off",
+  "skip": "Skip",
+
+  "onboardingSemantics": "Onboarding. Drag the note up or down to change its pitch, or tap a line to jump to it.",
+  "onboardingBody": "Drag the note up or down to change pitch. Tap a line to jump there.",
+  "gotIt": "Got it",
+
+  "guidedLesson": "Lesson {number} of {total}: {title}",
+  "@guidedLesson": {
+    "placeholders": {
+      "number": { "type": "int" },
+      "total": { "type": "int" },
+      "title": { "type": "String" }
+    }
+  },
+  "guidedExit": "Exit guided path",
+  "guidedWellDone": "That is the note. Well done!",
+  "guidedDragToTarget": "Drag the note to the hollow notehead.",
+
+  "practiceTitle": "Practice",
+  "practiceExit": "Exit practice",
+  "practicePrompt": "What note is this?",
+  "practicePromptHint": "Pick the name of the note on the staff. Best streak: {bestStreak}.",
+  "@practicePromptHint": {
+    "placeholders": {
+      "bestStreak": { "type": "int" }
+    }
+  },
+  "practiceCorrect": "Correct! It is {answer}.",
+  "@practiceCorrect": {
+    "placeholders": {
+      "answer": { "type": "String" }
+    }
+  },
+  "practiceWrong": "Not quite. It is {answer}.",
+  "@practiceWrong": {
+    "placeholders": {
+      "answer": { "type": "String" }
+    }
+  },
+
+  "readTitle": "Play",
+  "readExit": "Exit play",
+  "readPhraseComplete": "Phrase complete.",
+  "readTryAgain": "Not quite \u2014 try the next note again.",
+  "readPrompt": "Play the notes on the staff, left to right.",
+  "readHint": "Best on a fresh phrase each time. Wrong keys are not counted, so take your time.",
+  "hearPhrase": "Hear phrase",
+  "newPhrase": "New phrase",
+
+  "jianpuHint": "1 = Do ... 8 = Do",
+  "scaleDegree": "degree {degree}",
+  "@scaleDegree": {
+    "placeholders": {
+      "degree": { "type": "String" }
+    }
+  },
+  "outsideScale": "outside scale",
+  "playScale": "Play the highlighted scale",
+  "playProgression": "Play the progression",
+  "playNote": "Play note",
+  "playChord": "Play chord",
+  "higher": "Higher",
+  "lower": "Lower",
+
+  "keySignature": "Key signature",
+  "major": "Major",
+  "minor": "Minor",
+  "keyMenuLabel": "Key: {key}",
+  "@keyMenuLabel": {
+    "placeholders": {
+      "key": { "type": "String" }
+    }
+  },
+  "scaleHighlight": "Scale highlight",
+  "highlightLabel": "Highlight: {label}",
+  "@highlightLabel": {
+    "placeholders": {
+      "label": { "type": "String" }
+    }
+  },
+  "chordsTitle": "Chords",
+  "chordsLabel": "Chords: {label}",
+  "@chordsLabel": {
+    "placeholders": {
+      "label": { "type": "String" }
+    }
+  },
+  "progressionTitle": "Progression",
+  "progressionLabel": "Progression: {label}",
+  "@progressionLabel": {
+    "placeholders": {
+      "label": { "type": "String" }
+    }
+  },
+  "progPop": "Pop",
+  "progDooWop": "Doo-wop",
+  "progAxis": "Axis",
+  "progFolk": "Folk",
+  "progRock": "Rock",
+  "progAnthem": "Anthem",
+  "progSinger": "Singer",
+  "progBallad": "Ballad",
+  "progEmo": "Emo",
+  "progCadence": "Cadence",
+  "progJazz": "Jazz",
+  "progTurnaround": "Turnaround",
+  "progCircle": "Circle",
+  "progMinorPop": "Minor pop",
+  "progMinorRock": "Minor rock",
+  "progMinor": "Minor",
+  "progAndalusian": "Andalusian",
+  "progCanon": "Canon",
+  "noDiatonicChord": "chromatic note \u2013 no diatonic chord",
+  "diatonicChordCaption": "{roman}  \u00B7  {quality}  \u00B7  {inversion} in {scale}",
+  "@diatonicChordCaption": {
+    "placeholders": {
+      "roman": { "type": "String" },
+      "quality": { "type": "String" },
+      "inversion": { "type": "String" },
+      "scale": { "type": "String" }
+    }
+  },
+  "chromaticChordCaption": "{roman}  \u00B7  {quality}  \u00B7  {inversion}  \u00B7  chromatic",
+  "@chromaticChordCaption": {
+    "placeholders": {
+      "roman": { "type": "String" },
+      "quality": { "type": "String" },
+      "inversion": { "type": "String" }
+    }
+  },
+  "chosenChordCaption": "{quality}  \u00B7  {inversion}  \u00B7  chosen chord",
+  "@chosenChordCaption": {
+    "placeholders": {
+      "quality": { "type": "String" },
+      "inversion": { "type": "String" }
+    }
+  },
+  "chooseChord": "Choose a chord",
+
+  "noteStaff": "Note staff",
+  "noteStaffValue": "Note staff, {value}",
+  "@noteStaffValue": {
+    "placeholders": {
+      "value": { "type": "String" }
+    }
+  },
+  "staffHint": "Drag up or down to change the pitch, or tap a line to jump there. Use the arrow keys on a keyboard, or press space to hear the note.",
+  "resizeControlsPanel": "Resize controls panel",
+
+  "metronomeTitle": "Metronome",
+  "start": "Start",
+  "stop": "Stop",
+  "beatsPerMinute": "{tempo} \u00B7 beats per minute",
+  "@beatsPerMinute": {
+    "placeholders": {
+      "tempo": { "type": "String" }
+    }
+  },
+  "tempoLargo": "Largo",
+  "tempoLarghetto": "Larghetto",
+  "tempoAdagio": "Adagio",
+  "tempoAndante": "Andante",
+  "tempoModerato": "Moderato",
+  "tempoAllegro": "Allegro",
+  "tempoPresto": "Presto",
+  "tempoPrestissimo": "Prestissimo",
+  "slower": "Slower",
+  "faster": "Faster",
+  "tenSlower": "10 slower",
+  "tenFaster": "10 faster",
+  "timeSignature": "Time signature",
+  "firstBeatAccented": "The first beat of each bar is accented.",
+  "registerFinder": "Register finder",
+  "registerNote": "Note",
+  "registerZone": "Zone",
+  "stopLoop": "Stop the loop",
+  "holdThisNote": "Hold this note",
+  "stopSweep": "Stop the sweep",
+  "sweepRange": "Sweep {from} to {to}",
+  "@sweepRange": {
+    "placeholders": {
+      "from": { "type": "String" },
+      "to": { "type": "String" }
+    }
+  },
+  "registerReadout": "{note} \u00B7 {freq} Hz",
+  "@registerReadout": {
+    "placeholders": {
+      "note": { "type": "String" },
+      "freq": { "type": "String" }
+    }
+  },
+  "registerHint": "Loop holds the note steady; the sweep walks {from} to {to} so you can hear the same note in each zone.",
+  "@registerHint": {
+    "placeholders": {
+      "from": { "type": "String" },
+      "to": { "type": "String" }
+    }
+  },
+
+  "buildAChord": "Build a chord",
+  "clearAll": "Clear all",
+  "builderHint": "Tap the staff to add a note, then drag it or use the arrows. Tap a chord below to highlight its notes.",
+  "addAbove": "Add above",
+  "addBelow": "Add below",
+  "notesCount": "{count} of {max} notes",
+  "@notesCount": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "max": { "type": "int" }
+    }
+  },
+  "moveNoteUp": "Move the selected note up",
+  "moveNoteDown": "Move the selected note down",
+  "possibleChords": "Possible chords",
+  "possibleChordsHint": "Add at least two notes and every chord they could spell appears here.",
+  "noCloseChord": "No close chord found. Try moving a note.",
+  "playSymbol": "Play {symbol}",
+  "@playSymbol": {
+    "placeholders": {
+      "symbol": { "type": "String" }
+    }
+  },
+  "enharmonicTag": "enharmonic",
+  "addedTones": "Added: {tones}",
+  "@addedTones": {
+    "placeholders": {
+      "tones": { "type": "String" }
+    }
+  },
+  "missingTones": "Missing: {tones}",
+  "@missingTones": {
+    "placeholders": {
+      "tones": { "type": "String" }
+    }
+  },
+  "roleWithBass": "{role} ({bass} in bass)",
+  "@roleWithBass": {
+    "placeholders": {
+      "role": { "type": "String" },
+      "bass": { "type": "String" }
+    }
+  },
+  "bestMatch": "Best match",
+  "chordStaff": "Chord staff",
+  "chordStaffHint": "Tap to add a note, drag a note up or down to change it.",
+
+  "inversionRoot": "Root position",
+  "inversion1st": "1st inversion",
+  "inversion2nd": "2nd inversion",
+  "inversion3rd": "3rd inversion",
+  "inversion4th": "4th inversion",
+  "inversion5th": "5th inversion",
+  "inversion6th": "6th inversion",
+  "inversionNth": "{index}th inversion",
+  "@inversionNth": {
+    "placeholders": {
+      "index": { "type": "int" }
+    }
+  },
+
+  "clefTreble": "Treble",
+  "clefBass": "Bass",
+  "clefAlto": "Alto",
+  "clefName": "{clef} clef",
+  "@clefName": {
+    "placeholders": {
+      "clef": { "type": "String" }
+    }
+  },
+
+  "scaleMajor": "Major",
+  "scaleNaturalMinor": "Natural minor",
+  "scaleHarmonicMinor": "Harmonic minor",
+  "scaleMelodicMinor": "Melodic minor",
+  "scaleMajorPentatonic": "Major pentatonic",
+  "scaleMinorPentatonic": "Minor pentatonic",
+  "scaleBlues": "Blues",
+
+  "namingTitle": "Note naming",
+  "namingScientific": "Scientific",
+  "namingSolfege": "Solfege",
+  "namingJianpu": "Numbered",
+  "noteNameOnStaff": "Note name on staff",
+  "enharmonicEquivalent": "Enharmonic equivalent",
+
+  "stackTriads": "Triads",
+  "stackSixths": "Sixths",
+  "stackSevenths": "Sevenths",
+  "stackNinths": "Ninths",
+  "stackElevenths": "Elevenths",
+  "stackThirteenths": "Thirteenths",
+
+  "signatureNone": "no sharps or flats",
+  "signatureSharps": "{count, plural, =1{1 sharp} other{{count} sharps}}",
+  "@signatureSharps": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "signatureFlats": "{count, plural, =1{1 flat} other{{count} flats}}",
+  "@signatureFlats": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "sectionDisplay": "Display",
+  "sectionTheme": "Theme",
+  "sectionLanguage": "Language",
+  "sectionFeedback": "Feedback",
+  "sectionOpenSource": "Open source",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "languageSystem": "System default",
+  "aboutFeedbackBody": "This app is made by a beginner, not a music teacher. If something here does not make sense, or is simply wrong, please open an issue or drop me an email. Feature requests are welcome too, as long as they help you read notes, understand chords, or find a note or a sound. It is a companion for learning and practising, not a tool for composing or producing music.",
+  "aboutOpenSourceBody": "This app is built with Flutter, an open-source UI toolkit, and reads the bundled Bravura music font.",
+  "aboutGithub": "GitHub repository",
+  "aboutEmail": "Email",
+  "aboutWeb": "Web version",
+  "aboutBravura": "Bravura music font",
+  "aboutLicenses": "Open-source licenses",
+  "aboutLicensesSubtitle": "Flutter, packages and Bravura",
+  "licenseLegalese": "Bravura music font \u00A9 Steinberg Media Technologies GmbH, SIL Open Font License 1.1.",
+
+  "chqMajor": "major",
+  "chqMinor": "minor",
+  "chqDiminished": "diminished",
+  "chqAugmented": "augmented",
+  "chqMajorSixth": "major sixth",
+  "chqMinorSixth": "minor sixth",
+  "chqMajorSeventh": "major seventh",
+  "chqDominantSeventh": "dominant seventh",
+  "chqMinorSeventh": "minor seventh",
+  "chqHalfDiminishedSeventh": "half-diminished seventh",
+  "chqDiminishedSeventh": "diminished seventh",
+  "chqMinorMajorSeventh": "minor-major seventh",
+  "chqAugmentedMajorSeventh": "augmented major seventh",
+  "chqMajorNinth": "major ninth",
+  "chqDominantNinth": "dominant ninth",
+  "chqMinorNinth": "minor ninth",
+  "chqDominantSeventhFlatNinth": "dominant seventh flat ninth",
+  "chqDominantSeventhSharpNinth": "dominant seventh sharp ninth",
+  "chqMajorEleventh": "major eleventh",
+  "chqDominantEleventh": "dominant eleventh",
+  "chqMinorEleventh": "minor eleventh",
+  "chqDominantNinthSharpEleventh": "dominant ninth sharp eleventh",
+  "chqMajorThirteenth": "major thirteenth",
+  "chqDominantThirteenth": "dominant thirteenth",
+  "chqMinorThirteenth": "minor thirteenth",
+  "chqMajorThirteenthSharpEleventh": "major thirteenth sharp eleventh",
+  "chqDominantThirteenthSharpEleventh": "dominant thirteenth sharp eleventh",
+  "chqDominantEleventhFlatThirteenth": "dominant eleventh flat thirteenth",
+  "chqPowerChord": "power chord",
+  "chqSuspendedSecond": "suspended second",
+  "chqSuspendedFourth": "suspended fourth",
+  "chqDominantSeventhSuspendedFourth": "dominant seventh suspended fourth",
+  "chqAddedNinth": "added ninth",
+  "chqSixthNinth": "sixth ninth",
+  "chqDominantSeventhFlatFive": "dominant seventh flat five",
+  "chqAugmentedSeventh": "augmented seventh",
+  "chqAddedFourth": "added fourth",
+  "chqAddedSharpEleventh": "added sharp eleventh",
+  "chqMinorAddedNinth": "minor added ninth",
+  "chqMinorAddedEleventh": "minor added eleventh",
+  "chqNinthSuspendedFourth": "ninth suspended fourth",
+  "chqThirteenthSuspendedFourth": "thirteenth suspended fourth",
+  "chqMinorMajorNinth": "minor-major ninth",
+  "chqMinorMajorEleventh": "minor-major eleventh",
+  "chqMinorMajorThirteenth": "minor-major thirteenth",
+  "chqDominantSeventhFlatNinthSharpEleventh": "dominant seventh flat ninth sharp eleventh",
+  "chqDominantSeventhFlatNinthFlatThirteenth": "dominant seventh flat ninth flat thirteenth",
+  "chqAugmentedSixth": "augmented sixth",
+  "chqSixthNinthFlatFive": "sixth ninth flat five",
+
+  "lessonFiveLinesTitle": "The five lines",
+  "lessonMeetStaffTitle": "Meet the staff",
+  "lessonMeetStaffBody": "Music is written on a staff of five lines. Higher on the staff means a higher pitch. In the treble clef this middle line is B.",
+  "lessonLinesTitle": "Lines spell E G B D F",
+  "lessonLinesBody": "Notes on the lines are a third apart. One line down from B is G.",
+  "lessonBottomLineTitle": "The bottom line",
+  "lessonBottomLineBody": "The bottom line is E. Read the lines from the bottom up: E, G, B, D, F.",
+  "lessonYourTurnTitle": "Your turn",
+  "lessonLinesPracticeBody": "Drag the note down to the middle line (B).",
+  "lessonSpacesTitle": "The spaces",
+  "lessonSpacesSpellTitle": "Spaces spell F A C E",
+  "lessonSpacesSpellBody": "Notes in the spaces sit between the lines. The first space from the bottom is F.",
+  "lessonUpSpacesTitle": "Up the spaces",
+  "lessonUpSpacesBody": "The spaces from the bottom up are F, A, C, E.",
+  "lessonSpacesPracticeBody": "Drag the note to the top space (E).",
+  "lessonBassClefTitle": "The bass clef",
+  "lessonLowerClefTitle": "A lower clef",
+  "lessonLowerClefBody": "The bass clef is used for low instruments. Its middle line is D.",
+  "lessonBassBottomLineBody": "The bottom line of the bass staff is G, and the lines spell G, B, D, F, A.",
+  "lessonBassPracticeBody": "Drag the note up to the middle line (D).",
+  "lessonSharpsFlatsTitle": "Sharps and flats",
+  "lessonSharpsTitle": "Sharps",
+  "lessonSharpsBody": "A sharp raises a note by a half step. In G major every F becomes F sharp, written in the key signature.",
+  "lessonFlatsTitle": "Flats",
+  "lessonFlatsBody": "A flat lowers a note by a half step. In F major every B becomes B flat.",
+  "lessonSharpsPracticeBody": "In G major the F is sharp. Drag the note to the top line (F).",
+  "lessonAccidentalsTitle": "Accidentals",
+  "lessonSharpTitle": "Sharp",
+  "lessonSharpBody": "A sharp (\u266F) raises a note by a half step. This F cannot be written in C major without a sign, so a sharp is printed in front of it, making it F\u266F.",
+  "lessonFlatTitle": "Flat",
+  "lessonFlatBody": "A flat (\u266D) lowers a note by a half step. This B becomes B\u266D, with a flat sign in front of it.",
+  "lessonNaturalTitle": "Natural",
+  "lessonNaturalBody": "A natural (\u266E) cancels an earlier sharp or flat. In G major the key signature makes every F sharp, so an F natural needs a natural sign.",
+  "lessonAccidentalsPracticeBody": "Drag the note up to F and make it F\u266F.",
+
+  "solfegeC": "Do",
+  "solfegeD": "Re",
+  "solfegeE": "Mi",
+  "solfegeF": "Fa",
+  "solfegeG": "Sol",
+  "solfegeA": "La",
+  "solfegeB": "Si",
+
+  "inversionShortRoot": "Root",
+  "inversionShort1st": "1st",
+  "inversionShort2nd": "2nd",
+  "inversionShort3rd": "3rd"
+}

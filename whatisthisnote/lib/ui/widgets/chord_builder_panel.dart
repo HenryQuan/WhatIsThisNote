@@ -8,6 +8,8 @@ import '../../core/clef.dart';
 import '../../core/key.dart';
 import '../../core/note.dart';
 import '../../core/staff_geometry.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n.dart';
 import '../painters/chord_builder_painter.dart';
 
 /// The Chords tab: stack notes on a small staff, play them, and see every
@@ -74,6 +76,7 @@ class ChordBuilderPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final selected = selectedIndex != null && selectedIndex! < notes.length
         ? notes[selectedIndex!]
         : null;
@@ -97,7 +100,7 @@ class ChordBuilderPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Build a chord',
+                    l10n.buildAChord,
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
@@ -105,13 +108,12 @@ class ChordBuilderPanel extends StatelessWidget {
                   key: const Key('builder-clear'),
                   onPressed: notes.isEmpty ? null : onClearAll,
                   icon: const Icon(Icons.clear_all, size: 18),
-                  label: const Text('Clear all'),
+                  label: Text(l10n.clearAll),
                 ),
               ],
             ),
             Text(
-              'Tap the staff to add a note, then drag it or use the arrows. '
-              'Tap a chord below to highlight its notes.',
+              l10n.builderHint,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -142,7 +144,7 @@ class ChordBuilderPanel extends StatelessWidget {
                         ? onShowSuggestions
                         : null,
                     icon: const Icon(Icons.arrow_upward, size: 18),
-                    label: const Text('Add above'),
+                    label: Text(l10n.addAbove),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -151,7 +153,7 @@ class ChordBuilderPanel extends StatelessWidget {
                     key: const Key('builder-add-below'),
                     onPressed: notes.length < maxNotes ? onAddBelow : null,
                     icon: const Icon(Icons.arrow_downward, size: 18),
-                    label: const Text('Add below'),
+                    label: Text(l10n.addBelow),
                   ),
                 ),
               ],
@@ -181,7 +183,7 @@ class ChordBuilderPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${notes.length} of $maxNotes notes',
+                    l10n.notesCount(notes.length, maxNotes),
                     key: const Key('builder-count'),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -190,13 +192,13 @@ class ChordBuilderPanel extends StatelessWidget {
                 ),
                 IconButton(
                   key: const Key('builder-up'),
-                  tooltip: 'Move the selected note up',
+                  tooltip: l10n.moveNoteUp,
                   onPressed: selected == null ? null : () => onNudgeSelected(1),
                   icon: const Icon(Icons.keyboard_arrow_up),
                 ),
                 IconButton(
                   key: const Key('builder-down'),
-                  tooltip: 'Move the selected note down',
+                  tooltip: l10n.moveNoteDown,
                   onPressed: selected == null
                       ? null
                       : () => onNudgeSelected(-1),
@@ -207,12 +209,12 @@ class ChordBuilderPanel extends StatelessWidget {
                   key: const Key('builder-play'),
                   onPressed: notes.length >= 2 ? onPlayChord : null,
                   icon: const Icon(Icons.volume_up),
-                  label: const Text('Play'),
+                  label: Text(l10n.play),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text('Possible chords', style: theme.textTheme.titleSmall),
+            Text(l10n.possibleChords, style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),
             _matchList(context),
           ],
@@ -223,14 +225,12 @@ class ChordBuilderPanel extends StatelessWidget {
 
   Widget _matchList(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     if (notes.length < 2) {
-      return _hint(
-        theme,
-        'Add at least two notes and every chord they could spell appears here.',
-      );
+      return _hint(theme, l10n.possibleChordsHint);
     }
     if (matches.isEmpty) {
-      return _hint(theme, 'No close chord found. Try moving a note.');
+      return _hint(theme, l10n.noCloseChord);
     }
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -249,7 +249,7 @@ class ChordBuilderPanel extends StatelessWidget {
             for (var index = 0; index < matches.length; index++)
               SizedBox(
                 width: width,
-                child: _matchCard(theme, index, matches[index]),
+                child: _matchCard(theme, l10n, index, matches[index]),
               ),
           ],
         );
@@ -259,7 +259,12 @@ class ChordBuilderPanel extends StatelessWidget {
 
   /// One candidate chord as a compact card, so the list wraps across the row
   /// instead of stacking one full-width tile per line.
-  Widget _matchCard(ThemeData theme, int index, ChordMatch match) {
+  Widget _matchCard(
+    ThemeData theme,
+    AppLocalizations l10n,
+    int index,
+    ChordMatch match,
+  ) {
     final root = rootNoteFor(match.rootPitchClass);
     final chord = Chord.onNote(root, match.quality);
     final name = nameChordMatch(match, root: root, staffNotes: notes);
@@ -308,9 +313,11 @@ class ChordBuilderPanel extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(child: _matchSubtitle(theme, match, chord, name)),
+                    Expanded(
+                      child: _matchSubtitle(theme, l10n, match, chord, name),
+                    ),
                     IconButton(
-                      tooltip: 'Play $symbol',
+                      tooltip: l10n.playSymbol(symbol),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       iconSize: 20,
@@ -354,6 +361,7 @@ class ChordBuilderPanel extends StatelessWidget {
   /// closest shape.
   Widget _matchSubtitle(
     ThemeData theme,
+    AppLocalizations l10n,
     ChordMatch match,
     Chord chord,
     ChordName name,
@@ -367,16 +375,24 @@ class ChordBuilderPanel extends StatelessWidget {
       lines.add(Text(chord.noteNames.join(' \u2013 '), style: style));
       final index = _bassToneIndex(match);
       final bassName = bass?.pitchName ?? chord.rootName;
-      final role = index == null ? 'Root position' : _inversionName(index);
-      final tag = _isEnharmonic(match) ? ' \u00B7 enharmonic' : '';
-      lines.add(Text('$role ($bassName in bass)$tag', style: style));
+      final role = index == null
+          ? l10n.inversionRoot
+          : l10n.inversionLabel(index);
+      final tag = _isEnharmonic(match) ? ' \u00B7 ${l10n.enharmonicTag}' : '';
+      lines.add(Text(l10n.roleWithBass(role, bassName) + tag, style: style));
     } else {
       final hints = <String>[];
       if (name.added.isNotEmpty) {
-        hints.add('Added: ${name.added.map(_toneHint).join(', ')}');
+        hints.add(
+          l10n.addedTones(name.added.map((tone) => _toneHint(tone)).join(', ')),
+        );
       }
       if (name.missing.isNotEmpty) {
-        hints.add('Missing: ${name.missing.map(_toneHint).join(', ')}');
+        hints.add(
+          l10n.missingTones(
+            name.missing.map((tone) => _toneHint(tone)).join(', '),
+          ),
+        );
       }
       lines.add(Text(hints.join(' \u00B7 '), style: style));
     }
@@ -407,18 +423,6 @@ class ChordBuilderPanel extends StatelessWidget {
       }
     }
     return null;
-  }
-
-  /// Human readable inversion for a bass at chord-tone [index].
-  String _inversionName(int index) {
-    const labels = [
-      'Root position',
-      '1st inversion',
-      '2nd inversion',
-      '3rd inversion',
-      '4th inversion',
-    ];
-    return index < labels.length ? labels[index] : '$index-th inversion';
   }
 
   /// Whether [match] is an exact match that spells the same notes as the best
@@ -459,7 +463,7 @@ class _BestMatchBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        'Best match',
+        context.l10n.bestMatch,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: Colors.white,
           fontWeight: FontWeight.bold,
@@ -587,8 +591,8 @@ class _ChordStaffState extends State<ChordStaff> {
           onVerticalDragEnd: (_) => _handleDragEnd(),
           onVerticalDragCancel: _handleDragEnd,
           child: Semantics(
-            label: 'Chord staff',
-            hint: 'Tap to add a note, drag a note up or down to change it.',
+            label: context.l10n.chordStaff,
+            hint: context.l10n.chordStaffHint,
             child: CustomPaint(
               size: Size.infinite,
               painter: ChordBuilderPainter(

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/audio/note_player.dart';
 import 'package:whatisthisnote/core/accidental.dart';
+import 'package:whatisthisnote/core/app_language.dart';
 import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/display_preferences.dart';
@@ -12,6 +13,7 @@ import 'package:whatisthisnote/core/display_preferences_store.dart';
 import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
+import 'package:whatisthisnote/l10n/app_localizations.dart';
 import 'package:whatisthisnote/main.dart';
 import 'package:whatisthisnote/ui/painters/notation_painter.dart';
 import 'package:whatisthisnote/ui/widgets/about_panel.dart';
@@ -246,6 +248,55 @@ void main() {
     );
   });
 
+  testWidgets('adding a third above starts from the selected note', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Select C4 (step -2 in the treble clef) by tapping the staff.
+    final rect = tester.getRect(find.byType(ChordStaff));
+    final geometry = StaffGeometry.forSize(rect.size);
+    await tester.tapAt(
+      Offset(rect.center.dx, rect.top + geometry.yForStep(-2)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      (tester.widget<InputChip>(find.byKey(const Key('builder-note-0'))).label
+              as Text)
+          .data,
+      'C4',
+    );
+
+    // A third above C4 is E4, not D5.
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pumpAndSettle();
+    expect(
+      (tester.widget<InputChip>(find.byKey(const Key('builder-note-1'))).label
+              as Text)
+          .data,
+      'E4',
+    );
+
+    // A third below C4 is A3.
+    await tester.tap(find.byKey(const Key('builder-add-below')));
+    await tester.pumpAndSettle();
+    expect(
+      (tester.widget<InputChip>(find.byKey(const Key('builder-note-2'))).label
+              as Text)
+          .data,
+      'A3',
+    );
+  });
+
   testWidgets('the chord builder suggests the closest chord', (tester) async {
     await tester.binding.setSurfaceSize(const Size(400, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -267,6 +318,74 @@ void main() {
 
     expect(find.text('Dm(no5)'), findsOneWidget);
     expect(find.textContaining('Missing: A (5th)'), findsWidgets);
+    expect(
+      tester
+          .widget<PianoKeyboard>(find.byKey(const Key('chord-keyboard')))
+          .suggestedPitchClasses,
+      {2, 5, 9},
+    );
+  });
+
+  testWidgets('the chord keyboard outlines black-key chord tones', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // B on the middle line plus D above it. Bm still needs F♯ (pitch class 6).
+    final rect = tester.getRect(find.byType(ChordStaff));
+    final geometry = StaffGeometry.forSize(rect.size);
+    await tester.tapAt(Offset(rect.center.dx, rect.top + geometry.yForStep(4)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pumpAndSettle();
+
+    final keyboard = tester.widget<PianoKeyboard>(
+      find.byKey(const Key('chord-keyboard')),
+    );
+    expect(keyboard.suggestedPitchClasses, contains(6));
+  });
+
+  testWidgets('the chord builder writes the chord names on the keyboard', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Select C4, then stack E, G and B: a Cmaj7.
+    final rect = tester.getRect(find.byType(ChordStaff));
+    final geometry = StaffGeometry.forSize(rect.size);
+    await tester.tapAt(
+      Offset(rect.center.dx, rect.top + geometry.yForStep(-2)),
+    );
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.byKey(const Key('builder-add')));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    final keyboard = tester.widget<PianoKeyboard>(
+      find.byKey(const Key('chord-keyboard')),
+    );
+    expect(keyboard.chordMidis, containsAll(<int>[60, 64, 67, 71]));
+    expect(keyboard.chordLabels, {0: 'C', 4: 'E', 7: 'G', 11: 'B'});
   });
 
   testWidgets('the chord builder plays the notes the learner stacked', (
@@ -715,6 +834,29 @@ void main() {
     );
   });
 
+  testWidgets('the Note piano writes the chord names on the keys', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    // Move the note from B4 down to C4.
+    for (var i = 0; i < 6; i++) {
+      await tester.tap(find.byTooltip('Lower'));
+      await tester.pumpAndSettle();
+    }
+    expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'C4');
+
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sevenths').last);
+    await tester.pumpAndSettle();
+
+    // The Cmaj7 tones are named on the piano: C, E, G and B.
+    final keyboard = tester.widget<PianoKeyboard>(find.byType(PianoKeyboard));
+    expect(keyboard.chordPitchClasses, {0, 4, 7, 11});
+    expect(keyboard.chordLabels, {0: 'C', 4: 'E', 7: 'G', 11: 'B'});
+  });
+
   testWidgets('an out-of-scale note gets a transformed chord', (tester) async {
     await tester.pumpWidget(const WhatIsThisNoteApp());
 
@@ -1134,6 +1276,73 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(StaffView), findsOneWidget);
+  });
+
+  testWidgets('the language picker switches language and saves the choice', (
+    tester,
+  ) async {
+    final store = InMemoryDisplayPreferencesStore();
+    await tester.pumpWidget(WhatIsThisNoteApp(displayPreferencesStore: store));
+
+    await tester.tap(find.byTooltip('About'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('language-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('language-picker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('\u65E5\u672C\u8A9E').last);
+    await tester.pumpAndSettle();
+
+    expect((await store.load()).language, AppLanguage.japanese);
+    expect(
+      find.text('\u3053\u306E\u97F3\u7B26\u306F\u4F55\uFF1F'),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('a saved language is restored on start', (tester) async {
+    final store = InMemoryDisplayPreferencesStore(
+      preferences: const DisplayPreferences(language: AppLanguage.french),
+    );
+    await tester.pumpWidget(WhatIsThisNoteApp(displayPreferencesStore: store));
+    await tester.pumpAndSettle();
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.locale, const Locale('fr'));
+  });
+
+  testWidgets('solfege and inversion names follow the language', (
+    tester,
+  ) async {
+    final store = InMemoryDisplayPreferencesStore(
+      preferences: const DisplayPreferences(
+        language: AppLanguage.japanese,
+        naming: NamingSystem.solfege,
+      ),
+    );
+    await tester.pumpWidget(WhatIsThisNoteApp(displayPreferencesStore: store));
+    await tester.pumpAndSettle();
+
+    // The default note is B4, or シ in Japanese solfege.
+    expect(
+      tester.widget<Text>(find.byKey(const Key('note-name'))).data,
+      '\u30B7',
+    );
+    final painter = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((custom) => custom.painter)
+        .whereType<NotationPainter>()
+        .single;
+    expect(painter.labelNoteName, '\u30B7');
+
+    // The chord lab's inversion buttons are localized too.
+    final ja = lookupAppLocalizations(const Locale('ja'));
+    await tester.tap(find.byKey(const Key('chord-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(ja.stackTriads).last);
+    await tester.pumpAndSettle();
+    expect(find.text(ja.inversionShort1st), findsOneWidget);
   });
 
   testWidgets('the play button plays the current note', (tester) async {

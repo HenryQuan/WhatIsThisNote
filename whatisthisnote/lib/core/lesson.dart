@@ -1,3 +1,4 @@
+import '../l10n/app_localizations.dart';
 import 'accidental.dart';
 import 'clef.dart';
 import 'key.dart';
@@ -57,38 +58,33 @@ const MusicalKey _cMajor = MusicalKey('C', KeyMode.major, 0);
 const MusicalKey _gMajor = MusicalKey('G', KeyMode.major, 1);
 const MusicalKey _fMajor = MusicalKey('F', KeyMode.major, -1);
 
-/// The guided theory path, in order.
-const List<Lesson> kLessons = [
-  Lesson('The five lines', [
+/// The guided theory path, in order, with all text localized.
+List<Lesson> buildLessons(AppLocalizations l10n) => [
+  Lesson(l10n.lessonFiveLinesTitle, [
     LessonStep(
-      title: 'Meet the staff',
-      instruction:
-          'Music is written on a staff of five lines. Higher on the staff '
-          'means a higher pitch. In the treble clef this middle line is B.',
+      title: l10n.lessonMeetStaffTitle,
+      instruction: l10n.lessonMeetStaffBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 4,
     ),
     LessonStep(
-      title: 'Lines spell E G B D F',
-      instruction:
-          'Notes on the lines are a third apart. One line down from B is G.',
+      title: l10n.lessonLinesTitle,
+      instruction: l10n.lessonLinesBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 2,
     ),
     LessonStep(
-      title: 'The bottom line',
-      instruction:
-          'The bottom line is E. Read the lines from the bottom up: '
-          'E, G, B, D, F.',
+      title: l10n.lessonBottomLineTitle,
+      instruction: l10n.lessonBottomLineBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 0,
     ),
     LessonStep(
-      title: 'Your turn',
-      instruction: 'Drag the note down to the middle line (B).',
+      title: l10n.lessonYourTurnTitle,
+      instruction: l10n.lessonLinesPracticeBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 6,
@@ -96,26 +92,24 @@ const List<Lesson> kLessons = [
       targetStep: 4,
     ),
   ]),
-  Lesson('The spaces', [
+  Lesson(l10n.lessonSpacesTitle, [
     LessonStep(
-      title: 'Spaces spell F A C E',
-      instruction:
-          'Notes in the spaces sit between the lines. The first space from '
-          'the bottom is F.',
+      title: l10n.lessonSpacesSpellTitle,
+      instruction: l10n.lessonSpacesSpellBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 1,
     ),
     LessonStep(
-      title: 'Up the spaces',
-      instruction: 'The spaces from the bottom up are F, A, C, E.',
+      title: l10n.lessonUpSpacesTitle,
+      instruction: l10n.lessonUpSpacesBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 3,
     ),
     LessonStep(
-      title: 'Your turn',
-      instruction: 'Drag the note to the top space (E).',
+      title: l10n.lessonYourTurnTitle,
+      instruction: l10n.lessonSpacesPracticeBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 1,
@@ -123,27 +117,24 @@ const List<Lesson> kLessons = [
       targetStep: 7,
     ),
   ]),
-  Lesson('The bass clef', [
+  Lesson(l10n.lessonBassClefTitle, [
     LessonStep(
-      title: 'A lower clef',
-      instruction:
-          'The bass clef is used for low instruments. Its middle line is D.',
+      title: l10n.lessonLowerClefTitle,
+      instruction: l10n.lessonLowerClefBody,
       clef: Clef.bass,
       key: _cMajor,
       step: 4,
     ),
     LessonStep(
-      title: 'The bottom line',
-      instruction:
-          'The bottom line of the bass staff is G, and the lines spell '
-          'G, B, D, F, A.',
+      title: l10n.lessonBottomLineTitle,
+      instruction: l10n.lessonBassBottomLineBody,
       clef: Clef.bass,
       key: _cMajor,
       step: 0,
     ),
     LessonStep(
-      title: 'Your turn',
-      instruction: 'Drag the note up to the middle line (D).',
+      title: l10n.lessonYourTurnTitle,
+      instruction: l10n.lessonBassPracticeBody,
       clef: Clef.bass,
       key: _cMajor,
       step: 0,
@@ -151,29 +142,24 @@ const List<Lesson> kLessons = [
       targetStep: 4,
     ),
   ]),
-  Lesson('Sharps and flats', [
+  Lesson(l10n.lessonSharpsFlatsTitle, [
     LessonStep(
-      title: 'Sharps',
-      instruction:
-          'A sharp raises a note by a half step. In G major every F becomes '
-          'F sharp, written in the key signature.',
+      title: l10n.lessonSharpsTitle,
+      instruction: l10n.lessonSharpsBody,
       clef: Clef.treble,
       key: _gMajor,
       step: 8,
     ),
     LessonStep(
-      title: 'Flats',
-      instruction:
-          'A flat lowers a note by a half step. In F major every B becomes '
-          'B flat.',
+      title: l10n.lessonFlatsTitle,
+      instruction: l10n.lessonFlatsBody,
       clef: Clef.treble,
       key: _fMajor,
       step: 4,
     ),
     LessonStep(
-      title: 'Your turn',
-      instruction:
-          'In G major the F is sharp. Drag the note to the top line (F).',
+      title: l10n.lessonYourTurnTitle,
+      instruction: l10n.lessonSharpsPracticeBody,
       clef: Clef.treble,
       key: _gMajor,
       step: 1,
@@ -181,42 +167,34 @@ const List<Lesson> kLessons = [
       targetStep: 8,
     ),
   ]),
-  Lesson('Accidentals', [
+  Lesson(l10n.lessonAccidentalsTitle, [
     LessonStep(
-      title: 'Sharp',
-      instruction:
-          'A sharp (\u266F) raises a note by a half step. This F cannot be '
-          'written in C major without a sign, so a sharp is printed in front '
-          'of it, making it F\u266F.',
+      title: l10n.lessonSharpTitle,
+      instruction: l10n.lessonSharpBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 8,
       accidental: Accidental.sharp,
     ),
     LessonStep(
-      title: 'Flat',
-      instruction:
-          'A flat (\u266D) lowers a note by a half step. This B becomes '
-          'B\u266D, with a flat sign in front of it.',
+      title: l10n.lessonFlatTitle,
+      instruction: l10n.lessonFlatBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 4,
       accidental: Accidental.flat,
     ),
     LessonStep(
-      title: 'Natural',
-      instruction:
-          'A natural (\u266E) cancels an earlier sharp or flat. In G major '
-          'the key signature makes every F sharp, so an F natural needs a '
-          'natural sign.',
+      title: l10n.lessonNaturalTitle,
+      instruction: l10n.lessonNaturalBody,
       clef: Clef.treble,
       key: _gMajor,
       step: 8,
       accidental: Accidental.natural,
     ),
     LessonStep(
-      title: 'Your turn',
-      instruction: 'Drag the note up to F and make it F\u266F.',
+      title: l10n.lessonYourTurnTitle,
+      instruction: l10n.lessonAccidentalsPracticeBody,
       clef: Clef.treble,
       key: _cMajor,
       step: 4,

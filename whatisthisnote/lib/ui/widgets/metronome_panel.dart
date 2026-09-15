@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/metronome.dart';
+import '../../l10n/l10n.dart';
 
 /// The Metronome tab: a tempo click, plus a register finder that plays a chosen
 /// pitch or sweeps that same pitch across every zone so the learner can feel
@@ -124,14 +125,15 @@ class _MetronomeClick extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     return _SectionCard(
       icon: Icons.av_timer,
-      title: 'Metronome',
+      title: l10n.metronomeTitle,
       trailing: FilledButton.tonalIcon(
         key: const Key('metronome-toggle'),
         onPressed: onToggle,
         icon: Icon(playing ? Icons.stop : Icons.play_arrow),
-        label: Text(playing ? 'Stop' : 'Start'),
+        label: Text(playing ? l10n.stop : l10n.start),
       ),
       children: [
         Center(
@@ -145,7 +147,7 @@ class _MetronomeClick extends StatelessWidget {
                 ),
               ),
               Text(
-                '${tempoName(bpm)} · beats per minute',
+                l10n.beatsPerMinute(l10n.tempoLabel(bpm)),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -174,26 +176,26 @@ class _MetronomeClick extends StatelessWidget {
           children: [
             _TempoStep(
               key: const Key('bpm-down-10'),
-              tooltip: '10 slower',
+              tooltip: l10n.tenSlower,
               icon: Icons.replay_10,
               onPressed: bpm > kMinBpm ? () => onBpmChanged(bpm - 10) : null,
             ),
             _TempoStep(
               key: const Key('bpm-down'),
-              tooltip: 'Slower',
+              tooltip: l10n.slower,
               icon: Icons.remove,
               onPressed: bpm > kMinBpm ? () => onBpmChanged(bpm - 1) : null,
             ),
             const SizedBox(width: 16),
             _TempoStep(
               key: const Key('bpm-up'),
-              tooltip: 'Faster',
+              tooltip: l10n.faster,
               icon: Icons.add,
               onPressed: bpm < kMaxBpm ? () => onBpmChanged(bpm + 1) : null,
             ),
             _TempoStep(
               key: const Key('bpm-up-10'),
-              tooltip: '10 faster',
+              tooltip: l10n.tenFaster,
               icon: Icons.forward_10,
               onPressed: bpm < kMaxBpm ? () => onBpmChanged(bpm + 10) : null,
             ),
@@ -231,7 +233,7 @@ class _MetronomeClick extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _FieldLabel('Time signature'),
+        _FieldLabel(l10n.timeSignature),
         const SizedBox(height: 6),
         SegmentedButton<int>(
           key: const Key('beats-per-bar'),
@@ -246,7 +248,7 @@ class _MetronomeClick extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'The first beat of each bar is accented.',
+          l10n.firstBeatAccented,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
@@ -310,13 +312,14 @@ class _RegisterFinder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final frequency = frequencyForPitchClass(pitchClass, zone);
 
     return _SectionCard(
       icon: Icons.hearing,
-      title: 'Register finder',
+      title: l10n.registerFinder,
       children: [
-        _FieldLabel('Note'),
+        _FieldLabel(l10n.registerNote),
         const SizedBox(height: 6),
         Wrap(
           spacing: 6,
@@ -333,7 +336,7 @@ class _RegisterFinder extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
-        _FieldLabel('Zone'),
+        _FieldLabel(l10n.registerZone),
         const SizedBox(height: 6),
         Wrap(
           spacing: 6,
@@ -357,13 +360,13 @@ class _RegisterFinder extends StatelessWidget {
                 key: const Key('register-play'),
                 onPressed: onPlayNote,
                 icon: const Icon(Icons.volume_up),
-                label: const Text('Play note'),
+                label: Text(l10n.playNote),
               ),
             ),
             const SizedBox(width: 8),
             IconButton.filledTonal(
               key: const Key('register-loop'),
-              tooltip: looping ? 'Stop the loop' : 'Hold this note',
+              tooltip: looping ? l10n.stopLoop : l10n.holdThisNote,
               isSelected: looping,
               onPressed: onToggleLoop,
               icon: const Icon(Icons.loop),
@@ -372,9 +375,11 @@ class _RegisterFinder extends StatelessWidget {
             IconButton.filledTonal(
               key: const Key('register-sweep'),
               tooltip: sweeping
-                  ? 'Stop the sweep'
-                  : 'Sweep ${pitchClassName(pitchClass)}$kMinZone to '
-                        '${pitchClassName(pitchClass)}$kMaxZone',
+                  ? l10n.stopSweep
+                  : l10n.sweepRange(
+                      '${pitchClassName(pitchClass)}$kMinZone',
+                      '${pitchClassName(pitchClass)}$kMaxZone',
+                    ),
               isSelected: sweeping,
               onPressed: onSweep,
               icon: const Icon(Icons.swap_vert),
@@ -383,17 +388,20 @@ class _RegisterFinder extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          '${pitchClassName(pitchClass)}$zone · ${frequency.toStringAsFixed(1)} Hz',
+          l10n.registerReadout(
+            '${pitchClassName(pitchClass)}$zone',
+            frequency.toStringAsFixed(1),
+          ),
           key: const Key('register-readout'),
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
         Text(
-          'Loop holds the note steady; the sweep walks '
-          '${pitchClassName(pitchClass)}$kMinZone to '
-          '${pitchClassName(pitchClass)}$kMaxZone so you can hear the same '
-          'note in each zone.',
+          l10n.registerHint(
+            '${pitchClassName(pitchClass)}$kMinZone',
+            '${pitchClassName(pitchClass)}$kMaxZone',
+          ),
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

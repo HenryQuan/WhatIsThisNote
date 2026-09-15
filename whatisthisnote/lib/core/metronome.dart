@@ -19,17 +19,51 @@ const int kMaxZone = 8;
 Duration beatInterval(int bpm) =>
     Duration(microseconds: 60000000 ~/ bpm.clamp(kMinBpm, kMaxBpm));
 
+/// The traditional tempo band a BPM value falls into.
+enum Tempo {
+  largo,
+  larghetto,
+  adagio,
+  andante,
+  moderato,
+  allegro,
+  presto,
+  prestissimo,
+}
+
+/// The [Tempo] band for [bpm], clamped to the supported range.
+Tempo tempoFor(int bpm) {
+  final value = bpm.clamp(kMinBpm, kMaxBpm);
+  if (value < 45) return Tempo.largo;
+  if (value < 60) return Tempo.larghetto;
+  if (value < 76) return Tempo.adagio;
+  if (value < 108) return Tempo.andante;
+  if (value < 120) return Tempo.moderato;
+  if (value < 168) return Tempo.allegro;
+  if (value < 200) return Tempo.presto;
+  return Tempo.prestissimo;
+}
+
 /// The traditional Italian tempo name for [bpm], e.g. `Andante`.
 String tempoName(int bpm) {
-  final value = bpm.clamp(kMinBpm, kMaxBpm);
-  if (value < 45) return 'Largo';
-  if (value < 60) return 'Larghetto';
-  if (value < 76) return 'Adagio';
-  if (value < 108) return 'Andante';
-  if (value < 120) return 'Moderato';
-  if (value < 168) return 'Allegro';
-  if (value < 200) return 'Presto';
-  return 'Prestissimo';
+  switch (tempoFor(bpm)) {
+    case Tempo.largo:
+      return 'Largo';
+    case Tempo.larghetto:
+      return 'Larghetto';
+    case Tempo.adagio:
+      return 'Adagio';
+    case Tempo.andante:
+      return 'Andante';
+    case Tempo.moderato:
+      return 'Moderato';
+    case Tempo.allegro:
+      return 'Allegro';
+    case Tempo.presto:
+      return 'Presto';
+    case Tempo.prestissimo:
+      return 'Prestissimo';
+  }
 }
 
 /// The twelve pitch classes, always labelled with sharps. The finder spells a

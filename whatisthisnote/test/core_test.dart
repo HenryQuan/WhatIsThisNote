@@ -17,6 +17,8 @@ import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/quiz.dart';
 import 'package:whatisthisnote/core/scale.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
+import 'package:whatisthisnote/l10n/app_localizations.dart';
+import 'package:whatisthisnote/l10n/l10n.dart';
 
 void main() {
   group('Note', () {
@@ -67,6 +69,40 @@ void main() {
     test('transposes and compares', () {
       expect(Note(27).transpose(1), Note.fromLetter(NoteLetter.c, 4));
       expect(Note(27).compareTo(Note(28)) < 0, isTrue);
+    });
+  });
+
+  group('Localized names', () {
+    test('translates solfege names per language', () {
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      expect(ja.solfegeName(NoteLetter.b), '\u30B7');
+      expect(
+        ja.solfegeFor(
+          Note.fromLetter(NoteLetter.f, 4).withAccidental(Accidental.sharp),
+        ),
+        '\u30D5\u30A1\u266F',
+      );
+
+      final fr = lookupAppLocalizations(const Locale('fr'));
+      expect(fr.solfegeName(NoteLetter.d), 'Ré');
+
+      final pt = lookupAppLocalizations(const Locale('pt'));
+      expect(pt.solfegeName(NoteLetter.c), 'Dó');
+
+      final en = lookupAppLocalizations(const Locale('en'));
+      expect(en.solfegeName(NoteLetter.a), 'La');
+    });
+
+    test('translates the chord inversion button labels', () {
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      expect(ja.inversionShortLabel(0), '\u57FA\u672C\u5F62');
+      expect(ja.inversionShortLabel(1), '\u7B2C1\u8EE2\u56DE');
+
+      final en = lookupAppLocalizations(const Locale('en'));
+      expect(en.inversionShortLabel(0), 'Root');
+      expect(en.inversionShortLabel(1), '1st');
+      expect(en.inversionShortLabel(2), '2nd');
+      expect(en.inversionShortLabel(3), '3rd');
     });
   });
 
@@ -415,6 +451,24 @@ void main() {
       expect(second.displaySymbol, 'C/G');
     });
 
+    test('maps each chord tone to its pitch class and spelled name', () {
+      final cMaj7 = Chord.diatonic(
+        cMajor,
+        1,
+        extension: ChordExtension.seventh,
+      );
+      expect(cMaj7.symbol, 'Cmaj7');
+      expect(cMaj7.pitchClassNames, {0: 'C', 4: 'E', 7: 'G', 11: 'B'});
+      // Inverting rotates the bass but not which name belongs to which pitch.
+      final inverted = Chord.diatonic(
+        cMajor,
+        1,
+        extension: ChordExtension.seventh,
+        inversion: 1,
+      );
+      expect(inverted.pitchClassNames, {0: 'C', 4: 'E', 7: 'G', 11: 'B'});
+    });
+
     test('voices the chord as staff steps', () {
       final c = Chord.diatonic(cMajor, 1);
       expect(c.staffSteps(4), [4, 6, 8]);
@@ -653,8 +707,9 @@ void main() {
 
   group('Lesson', () {
     test('has well formed steps', () {
-      expect(kLessons, isNotEmpty);
-      for (final lesson in kLessons) {
+      final lessons = buildLessons(lookupAppLocalizations(const Locale('en')));
+      expect(lessons, isNotEmpty);
+      for (final lesson in lessons) {
         expect(lesson.title, isNotEmpty);
         expect(lesson.steps, isNotEmpty);
         expect(
@@ -754,10 +809,13 @@ void main() {
           break;
         }
       }
+      expect(differs, isTrue);
     });
 
     test('the accidentals lesson uses signs outside the key', () {
-      final lesson = kLessons.last;
+      final lesson = buildLessons(
+        lookupAppLocalizations(const Locale('en')),
+      ).last;
       expect(lesson.title, 'Accidentals');
       expect(
         lesson.steps.map((step) => step.accidental),
@@ -770,7 +828,6 @@ void main() {
       final practice = lesson.steps.firstWhere((step) => step.isPractice);
       expect(practice.targetAccidental, Accidental.sharp);
     });
-  });
   });
 
   group('Enharmonic', () {

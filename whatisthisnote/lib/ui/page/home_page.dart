@@ -17,6 +17,8 @@ import '../../core/note.dart';
 import '../../core/quiz.dart';
 import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
+import '../../l10n/app_localizations.dart';
+import '../../l10n/l10n.dart';
 import '../widgets/about_panel.dart';
 import '../widgets/chord_builder_panel.dart';
 import '../widgets/metronome_panel.dart';
@@ -50,12 +52,12 @@ const double _clickBeatHz = 880.0;
 enum _HomeTab { note, practice, metronome, chords, about }
 
 extension on _HomeTab {
-  String get label => switch (this) {
-    _HomeTab.note => 'Note',
-    _HomeTab.practice => 'Practice',
-    _HomeTab.metronome => 'Metronome',
-    _HomeTab.chords => 'Chords',
-    _HomeTab.about => 'About',
+  String label(AppLocalizations l10n) => switch (this) {
+    _HomeTab.note => l10n.tabNote,
+    _HomeTab.practice => l10n.tabPractice,
+    _HomeTab.metronome => l10n.tabMetronome,
+    _HomeTab.chords => l10n.tabChords,
+    _HomeTab.about => l10n.tabAbout,
   };
 
   IconData get icon => switch (this) {
@@ -460,20 +462,22 @@ class _HomePageState extends State<HomePage> {
     _setStep(_step + delta);
   }
 
-  Lesson get _lesson => kLessons[_lessonIndex];
+  List<Lesson> get _lessons => buildLessons(context.l10n);
+  Lesson get _lesson => _lessons[_lessonIndex];
   LessonStep get _lessonStep => _lesson.steps[_stepIndex];
   int get _totalSteps =>
-      kLessons.fold(0, (sum, lesson) => sum + lesson.steps.length);
+      _lessons.fold(0, (sum, lesson) => sum + lesson.steps.length);
   int get _completedSteps {
+    final lessons = _lessons;
     var count = 0;
     for (var i = 0; i < _lessonIndex; i++) {
-      count += kLessons[i].steps.length;
+      count += lessons[i].steps.length;
     }
     return count + _stepIndex;
   }
 
   bool get _isLastStep =>
-      _lessonIndex == kLessons.length - 1 &&
+      _lessonIndex == _lessons.length - 1 &&
       _stepIndex == _lesson.steps.length - 1;
 
   /// True once the learner has matched a practice step's target.
@@ -740,7 +744,7 @@ class _HomePageState extends State<HomePage> {
         _stepIndex--;
       } else {
         _lessonIndex--;
-        _stepIndex = kLessons[_lessonIndex].steps.length - 1;
+        _stepIndex = _lessons[_lessonIndex].steps.length - 1;
       }
     });
     _applyLessonStep();
@@ -941,9 +945,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Adds the next note a third above the top of the stack, for a precise way
-  /// in without tapping the staff.
+  /// in without tapping the staff. An empty builder starts on the middle line
+  /// (B4), so the first taps stack up as D, F, A.
   void _addBuilderNoteAbove() {
-    var topStep = 4;
+    if (_builderNotes.isEmpty) {
+      _addBuilderNote(6);
+      return;
+    }
+    var topStep = _clef.stepOf(_builderNotes.first);
     for (final note in _builderNotes) {
       final step = _clef.stepOf(note);
       if (step > topStep) topStep = step;
@@ -1125,8 +1134,8 @@ class _HomePageState extends State<HomePage> {
       onKeyEvent: _onShortcut,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'What is this note?',
+          title: Text(
+            context.l10n.appTitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1201,6 +1210,24 @@ class _HomePageState extends State<HomePage> {
                   ? _builderNotes[_builderSelected!]
                   : (_builderNotes.isNotEmpty ? _builderNotes.first : null);
 
+              // The closest chord (or the one the learner picked) supplies the
+              // ideal tones the keyboard outlines as a guide.
+              final builderMatches = _builderMatches();
+              final builderIdeal =
+                  _builderMatch ??
+                  (builderMatches.isEmpty ? null : builderMatches.first);
+              // Names written on the chord keys: the stacked notes win, so an
+              // accidental the learner chose is spelled the way they wrote it.
+              final builderChordLabels = <int, String>{
+                if (builderIdeal != null)
+                  ...Chord.onNote(
+                    _builderRootNote(builderIdeal.rootPitchClass),
+                    builderIdeal.quality,
+                  ).pitchClassNames,
+                for (final note in _builderNotes)
+                  note.midi % 12: note.pitchName,
+              };
+
               final chordStaff = Column(
                 children: [
                   Expanded(
@@ -1228,6 +1255,9 @@ class _HomePageState extends State<HomePage> {
                         for (final note in _builderNotes)
                           _keyboardMidiFor(note.midi),
                       },
+                      suggestedPitchClasses:
+                          builderIdeal?.pitchClasses ?? const <int>{},
+                      chordLabels: builderChordLabels,
                       height: 64,
                     ),
                   ),
@@ -1297,6 +1327,7 @@ class _HomePageState extends State<HomePage> {
                           lessonIndex: _lessonIndex,
                           stepIndex: _stepIndex,
                           totalSteps: _totalSteps,
+                          totalLessons: _lessons.length,
                           completedSteps: _completedSteps,
                           isLastStep: _isLastStep,
                           matched: _practiceMatched,
@@ -1361,7 +1392,7 @@ class _HomePageState extends State<HomePage> {
                   sidebar: sidebar,
                   notes: _builderNotes,
                   selectedIndex: _builderSelected,
-                  matches: _builderMatches(),
+                  matches: builderMatches,
                   selectedMatch: _builderMatch,
                   maxNotes: _maxBuilderNotes,
                   rootNoteFor: _builderRootNote,
@@ -1490,21 +1521,21 @@ class _HomePageState extends State<HomePage> {
       child: SegmentedButton<_PracticeActivity>(
         key: const Key('practice-mode-toggle'),
         showSelectedIcon: false,
-        segments: const [
+        segments: [
           ButtonSegment(
             value: _PracticeActivity.quiz,
-            label: Text('Practice'),
-            icon: Icon(Icons.quiz),
+            label: Text(context.l10n.modePractice),
+            icon: const Icon(Icons.quiz),
           ),
           ButtonSegment(
             value: _PracticeActivity.read,
-            label: Text('Play'),
-            icon: Icon(Icons.piano),
+            label: Text(context.l10n.modePlay),
+            icon: const Icon(Icons.piano),
           ),
           ButtonSegment(
             value: _PracticeActivity.guided,
-            label: Text('Guide'),
-            icon: Icon(Icons.school),
+            label: Text(context.l10n.modeGuide),
+            icon: const Icon(Icons.school),
           ),
         ],
         selected: {_activity},
@@ -1522,7 +1553,10 @@ class _HomePageState extends State<HomePage> {
     onDestinationSelected: (index) => _selectTab(_HomeTab.values[index]),
     destinations: [
       for (final tab in _HomeTab.values)
-        NavigationRailDestination(icon: Icon(tab.icon), label: Text(tab.label)),
+        NavigationRailDestination(
+          icon: Icon(tab.icon),
+          label: Text(tab.label(context.l10n)),
+        ),
     ],
   );
 
@@ -1533,8 +1567,8 @@ class _HomePageState extends State<HomePage> {
       for (final tab in _HomeTab.values)
         NavigationDestination(
           icon: Icon(tab.icon),
-          label: tab.label,
-          tooltip: tab.label,
+          label: tab.label(context.l10n),
+          tooltip: tab.label(context.l10n),
         ),
     ],
   );
@@ -1557,7 +1591,7 @@ class _SidebarResizer extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onHorizontalDragUpdate: (details) => onDrag(details.delta.dx),
         child: Semantics(
-          label: 'Resize controls panel',
+          label: context.l10n.resizeControlsPanel,
           child: SizedBox(
             width: 12,
             child: Center(
@@ -1580,11 +1614,10 @@ class _CoachMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     return Semantics(
       liveRegion: true,
-      label:
-          'Onboarding. Drag the note up or down to change its pitch, or tap '
-          'a line to jump to it.',
+      label: l10n.onboardingSemantics,
       child: Stack(
         children: [
           // The card body lets gestures fall through to the staff underneath;
@@ -1604,8 +1637,7 @@ class _CoachMark extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Drag the note up or down to change pitch. Tap a line '
-                        'to jump there.',
+                        l10n.onboardingBody,
                         style: TextStyle(color: scheme.onInverseSurface),
                       ),
                     ),
@@ -1626,7 +1658,7 @@ class _CoachMark extends StatelessWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: scheme.onInverseSurface,
                 ),
-                child: const Text('Got it'),
+                child: Text(l10n.gotIt),
               ),
             ),
           ),
@@ -1646,6 +1678,7 @@ class _GuidedPanel extends StatelessWidget {
     required this.lessonIndex,
     required this.stepIndex,
     required this.totalSteps,
+    required this.totalLessons,
     required this.completedSteps,
     required this.isLastStep,
     required this.matched,
@@ -1659,6 +1692,7 @@ class _GuidedPanel extends StatelessWidget {
   final int lessonIndex;
   final int stepIndex;
   final int totalSteps;
+  final int totalLessons;
   final int completedSteps;
   final bool isLastStep;
   final bool matched;
@@ -1670,6 +1704,7 @@ class _GuidedPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = context.l10n;
     final canGoBack = lessonIndex > 0 || stepIndex > 0;
     final canAdvance = !step.isPractice || matched;
 
@@ -1690,15 +1725,18 @@ class _GuidedPanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Lesson ${lessonIndex + 1} of ${kLessons.length}: '
-                      '${lesson.title}',
+                      l10n.guidedLesson(
+                        lessonIndex + 1,
+                        totalLessons,
+                        lesson.title,
+                      ),
                       key: const Key('guided-lesson'),
                       style: theme.textTheme.titleSmall,
                     ),
                   ),
                   IconButton(
                     key: const Key('guided-exit'),
-                    tooltip: 'Exit guided path',
+                    tooltip: l10n.guidedExit,
                     icon: const Icon(Icons.close),
                     onPressed: onExit,
                   ),
@@ -1733,9 +1771,7 @@ class _GuidedPanel extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        matched
-                            ? 'That is the note. Well done!'
-                            : 'Drag the note to the hollow notehead.',
+                        matched ? l10n.guidedWellDone : l10n.guidedDragToTarget,
                         key: const Key('guided-status'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1756,7 +1792,7 @@ class _GuidedPanel extends StatelessWidget {
                     child: OutlinedButton(
                       key: const Key('guided-back'),
                       onPressed: canGoBack ? onBack : null,
-                      child: const Text('Back'),
+                      child: Text(l10n.back),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1764,7 +1800,7 @@ class _GuidedPanel extends StatelessWidget {
                     child: FilledButton(
                       key: const Key('guided-next'),
                       onPressed: canAdvance ? onNext : null,
-                      child: Text(isLastStep ? 'Finish' : 'Next'),
+                      child: Text(isLastStep ? l10n.finish : l10n.next),
                     ),
                   ),
                 ],
@@ -1813,6 +1849,7 @@ class _PracticePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = context.l10n;
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -1831,7 +1868,7 @@ class _PracticePanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Practice',
+                      l10n.practiceTitle,
                       key: const Key('practice-title'),
                       style: theme.textTheme.titleSmall,
                     ),
@@ -1859,7 +1896,7 @@ class _PracticePanel extends StatelessWidget {
                   ),
                   IconButton(
                     key: const Key('practice-exit'),
-                    tooltip: 'Exit practice',
+                    tooltip: l10n.practiceExit,
                     icon: const Icon(Icons.close),
                     onPressed: onExit,
                   ),
@@ -1867,14 +1904,13 @@ class _PracticePanel extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'What note is this?',
+                l10n.practicePrompt,
                 key: const Key('practice-prompt'),
                 style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
               Text(
-                'Pick the name of the note on the staff. '
-                'Best streak: $bestStreak.',
+                l10n.practicePromptHint(bestStreak),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
@@ -1902,8 +1938,8 @@ class _PracticePanel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         _wasCorrect
-                            ? 'Correct! It is ${question.answer}.'
-                            : 'Not quite. It is ${question.answer}.',
+                            ? l10n.practiceCorrect(question.answer)
+                            : l10n.practiceWrong(question.answer),
                         key: const Key('practice-feedback'),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: _wasCorrect ? scheme.primary : scheme.error,
@@ -1920,7 +1956,7 @@ class _PracticePanel extends StatelessWidget {
                     child: OutlinedButton(
                       key: const Key('practice-reset'),
                       onPressed: onReset,
-                      child: const Text('Reset'),
+                      child: Text(l10n.reset),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1928,7 +1964,7 @@ class _PracticePanel extends StatelessWidget {
                     child: FilledButton(
                       key: const Key('practice-next'),
                       onPressed: _revealed ? onNext : null,
-                      child: const Text('Next note'),
+                      child: Text(l10n.nextNote),
                     ),
                   ),
                 ],
@@ -2015,6 +2051,7 @@ class _ReadPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = context.l10n;
     final note = keySignature.applyTo(clef.noteAt(melody.steps[index]));
 
     return ConstrainedBox(
@@ -2034,7 +2071,7 @@ class _ReadPanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Play',
+                      l10n.readTitle,
                       key: const Key('read-title'),
                       style: theme.textTheme.titleSmall,
                     ),
@@ -2046,7 +2083,7 @@ class _ReadPanel extends StatelessWidget {
                   ),
                   IconButton(
                     key: const Key('read-exit'),
-                    tooltip: 'Exit play',
+                    tooltip: l10n.readExit,
                     icon: const Icon(Icons.close),
                     onPressed: onExit,
                   ),
@@ -2055,10 +2092,10 @@ class _ReadPanel extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 done
-                    ? 'Phrase complete.'
+                    ? l10n.readPhraseComplete
                     : mistake
-                    ? 'Not quite \u2014 try the next note again.'
-                    : 'Play the notes on the staff, left to right.',
+                    ? l10n.readTryAgain
+                    : l10n.readPrompt,
                 key: const Key('read-prompt'),
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: mistake ? scheme.error : null,
@@ -2066,8 +2103,7 @@ class _ReadPanel extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Best on a fresh phrase each time. '
-                'Wrong keys are not counted, so take your time.',
+                l10n.readHint,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
@@ -2080,7 +2116,7 @@ class _ReadPanel extends StatelessWidget {
                       key: const Key('read-play'),
                       onPressed: onPlay,
                       icon: const Icon(Icons.volume_up),
-                      label: const Text('Hear phrase'),
+                      label: Text(l10n.hearPhrase),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2089,7 +2125,7 @@ class _ReadPanel extends StatelessWidget {
                       key: const Key('read-next'),
                       onPressed: onNext,
                       icon: const Icon(Icons.refresh),
-                      label: Text(done ? 'New phrase' : 'Skip'),
+                      label: Text(done ? l10n.newPhrase : l10n.skip),
                     ),
                   ),
                 ],
@@ -2154,7 +2190,7 @@ class _SequenceButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       iconSize: 20,
       icon: Icon(playing ? Icons.stop : Icons.play_arrow),
-      tooltip: playing ? 'Stop' : tooltip,
+      tooltip: playing ? context.l10n.stop : tooltip,
     );
   }
 }
@@ -2229,6 +2265,7 @@ class _Controls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final note = keySignature.applyTo(clef.noteAt(step));
 
     final scaleDegree = scale?.degreeLabelFor(note.midi);
@@ -2243,14 +2280,14 @@ class _Controls extends StatelessWidget {
 
     final primaryName = switch (display.naming) {
       NamingSystem.scientific => note.name,
-      NamingSystem.solfege => note.solfege,
+      NamingSystem.solfege => l10n.solfegeFor(note),
       NamingSystem.jianpu => keySignature.jianpuFor(note),
     };
     final secondaryNames = <(Key, String)>[
       if (display.naming != NamingSystem.scientific)
         (const Key('note-pitch'), note.name),
       if (display.naming != NamingSystem.solfege)
-        (const Key('note-solfege'), note.solfege),
+        (const Key('note-solfege'), l10n.solfegeFor(note)),
       if (display.naming != NamingSystem.jianpu)
         (const Key('note-jianpu'), keySignature.jianpuFor(note)),
     ];
@@ -2266,7 +2303,7 @@ class _Controls extends StatelessWidget {
       showSelectedIcon: false,
       segments: [
         for (final value in Clef.values)
-          ButtonSegment<Clef>(value: value, label: Text(value.label)),
+          ButtonSegment<Clef>(value: value, label: Text(l10n.clefLabel(value))),
       ],
       selected: {clef},
       onSelectionChanged: (selection) => onClefChanged(selection.first),
@@ -2305,7 +2342,7 @@ class _Controls extends StatelessWidget {
           key: const Key('play-highlight'),
           playing: highlightPlaying,
           onPressed: scale == null ? null : onPlayHighlight,
-          tooltip: 'Play the highlighted scale',
+          tooltip: l10n.playScale,
         ),
       ],
     );
@@ -2317,7 +2354,7 @@ class _Controls extends StatelessWidget {
           key: const Key('play-progression'),
           playing: progressionPlaying,
           onPressed: progression == null ? null : onPlayProgression,
-          tooltip: 'Play the progression',
+          tooltip: l10n.playProgression,
         ),
       ],
     );
@@ -2420,7 +2457,7 @@ class _Controls extends StatelessWidget {
                             ],
                           ),
                         Text(
-                          '${clef.label} clef',
+                          l10n.clefName(l10n.clefLabel(clef)),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -2450,9 +2487,9 @@ class _Controls extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 scale == null
-                                    ? '1 = Do ... 8 = Do'
-                                    : '${scale!.label} · '
-                                          '${inScale ? 'degree $scaleDegree' : 'outside scale'}',
+                                    ? l10n.jianpuHint
+                                    : '${l10n.scaleLabel(scale!)} \u00B7 '
+                                          '${inScale ? l10n.scaleDegree(scaleDegree) : l10n.outsideScale}',
                                 key: const Key('note-scale-caption'),
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
@@ -2472,21 +2509,21 @@ class _Controls extends StatelessWidget {
                         key: const Key('play-note'),
                         onPressed: onPlay,
                         icon: const Icon(Icons.volume_up),
-                        tooltip: chord == null ? 'Play note' : 'Play chord',
+                        tooltip: chord == null ? l10n.playNote : l10n.playChord,
                       ),
                       IconButton.filledTonal(
                         onPressed: step < kMaxStaffStep
                             ? () => onStepChanged(step + 1)
                             : null,
                         icon: const Icon(Icons.keyboard_arrow_up),
-                        tooltip: 'Higher',
+                        tooltip: l10n.higher,
                       ),
                       IconButton.filledTonal(
                         onPressed: step > kMinStaffStep
                             ? () => onStepChanged(step - 1)
                             : null,
                         icon: const Icon(Icons.keyboard_arrow_down),
-                        tooltip: 'Lower',
+                        tooltip: l10n.lower,
                       ),
                     ],
                   ),
@@ -2498,6 +2535,7 @@ class _Controls extends StatelessWidget {
                         label: note.pitchName,
                         highlightPitchClasses: scale?.pitchClasses,
                         chordPitchClasses: chord?.pitchClassSet,
+                        chordLabels: chord?.pitchClassNames,
                         playingPitchClass: playingPitchClass,
                         playingUpperOctave: playingUpperOctave,
                       ),
@@ -2522,6 +2560,7 @@ class _Controls extends StatelessWidget {
                   label: note.pitchName,
                   highlightPitchClasses: scale?.pitchClasses,
                   chordPitchClasses: chord?.pitchClassSet,
+                  chordLabels: chord?.pitchClassNames,
                   playingPitchClass: playingPitchClass,
                   playingUpperOctave: playingUpperOctave,
                 ),
@@ -2600,14 +2639,15 @@ class _KeySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     return PopupMenuButton<MusicalKey>(
-      tooltip: 'Key signature',
+      tooltip: l10n.keySignature,
       onSelected: onChanged,
       itemBuilder: (context) => [
-        const PopupMenuItem<MusicalKey>(
+        PopupMenuItem<MusicalKey>(
           enabled: false,
           height: 34,
-          child: _MenuHeader('Major'),
+          child: _MenuHeader(l10n.major),
         ),
         for (final key in kMajorKeys)
           PopupMenuItem<MusicalKey>(
@@ -2616,10 +2656,10 @@ class _KeySelector extends StatelessWidget {
             child: _KeyMenuEntry(musicalKey: key),
           ),
         const PopupMenuDivider(),
-        const PopupMenuItem<MusicalKey>(
+        PopupMenuItem<MusicalKey>(
           enabled: false,
           height: 34,
-          child: _MenuHeader('Minor'),
+          child: _MenuHeader(l10n.minor),
         ),
         for (final key in kMinorKeys)
           PopupMenuItem<MusicalKey>(
@@ -2644,7 +2684,7 @@ class _KeySelector extends StatelessWidget {
                 children: [
                   Flexible(
                     child: Text(
-                      'Key: ${value.label}',
+                      l10n.keyMenuLabel(l10n.keyName(value)),
                       key: const Key('key-label'),
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium,
@@ -2653,7 +2693,7 @@ class _KeySelector extends StatelessWidget {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      value.signatureLabel,
+                      l10n.keySignatureLabel(value),
                       textAlign: TextAlign.right,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -2683,19 +2723,21 @@ class _ScaleSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
+    final scaleType = value;
     return PopupMenuButton<_ScaleOption>(
-      tooltip: 'Scale highlight',
+      tooltip: l10n.scaleHighlight,
       onSelected: (option) => onChanged(option.type),
       itemBuilder: (context) => [
-        const PopupMenuItem<_ScaleOption>(
-          value: _ScaleOption(null),
-          child: Text('Off'),
+        PopupMenuItem<_ScaleOption>(
+          value: const _ScaleOption(null),
+          child: Text(l10n.off),
         ),
         const PopupMenuDivider(),
         for (final type in ScaleType.values)
           PopupMenuItem<_ScaleOption>(
             value: _ScaleOption(type),
-            child: Text(type.label),
+            child: Text(l10n.scaleTypeName(type)),
           ),
       ],
       child: Container(
@@ -2710,7 +2752,9 @@ class _ScaleSelector extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Highlight: ${value?.label ?? 'Off'}',
+                l10n.highlightLabel(
+                  scaleType == null ? l10n.off : l10n.scaleTypeName(scaleType),
+                ),
                 key: const Key('scale-label'),
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium,
@@ -2739,13 +2783,17 @@ class _ChordSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     return PopupMenuButton<ChordMode>(
-      tooltip: 'Chords',
+      tooltip: l10n.chordsTitle,
       initialValue: value,
       onSelected: onChanged,
       itemBuilder: (context) => [
         for (final mode in ChordMode.values)
-          PopupMenuItem<ChordMode>(value: mode, child: Text(mode.label)),
+          PopupMenuItem<ChordMode>(
+            value: mode,
+            child: Text(l10n.chordModeName(mode)),
+          ),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2759,7 +2807,7 @@ class _ChordSelector extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Chords: ${value.label}',
+                l10n.chordsLabel(l10n.chordModeName(value)),
                 key: const Key('chord-label'),
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium,
@@ -2786,12 +2834,15 @@ class _InversionSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Root', '1st', '2nd', '3rd'];
+    final l10n = context.l10n;
     return SegmentedButton<int>(
       showSelectedIcon: false,
       segments: [
         for (var i = 0; i < count; i++)
-          ButtonSegment<int>(value: i, label: Text(labels[i])),
+          ButtonSegment<int>(
+            value: i,
+            label: Text(l10n.inversionShortLabel(i)),
+          ),
       ],
       selected: {value.clamp(0, count - 1)},
       onSelectionChanged: (selection) => onChanged(selection.first),
@@ -2808,19 +2859,21 @@ class _ProgressionSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
+    final progression = value;
     return PopupMenuButton<_ProgressionOption>(
-      tooltip: 'Progression',
+      tooltip: l10n.progressionTitle,
       onSelected: (option) => onChanged(option.value),
       itemBuilder: (context) => [
-        const PopupMenuItem<_ProgressionOption>(
-          value: _ProgressionOption(null),
-          child: Text('Off'),
+        PopupMenuItem<_ProgressionOption>(
+          value: const _ProgressionOption(null),
+          child: Text(l10n.off),
         ),
         const PopupMenuDivider(),
         for (final progression in kProgressions)
           PopupMenuItem<_ProgressionOption>(
             value: _ProgressionOption(progression),
-            child: Text(progression.name),
+            child: Text(l10n.progressionName(progression)),
           ),
       ],
       child: Container(
@@ -2835,7 +2888,11 @@ class _ProgressionSelector extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Progression: ${value?.name ?? 'Off'}',
+                l10n.progressionLabel(
+                  progression == null
+                      ? l10n.off
+                      : l10n.progressionName(progression),
+                ),
                 key: const Key('progression-label'),
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium,
@@ -2999,22 +3056,32 @@ class _ChordReadout extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = context.l10n;
     final chord = this.chord;
     final caption = chord == null
-        ? 'chromatic note \u2013 no diatonic chord'
+        ? l10n.noDiatonicChord
         : chord.diatonic
-        ? '${chord.romanNumeral}  ·  ${chord.quality.label}  ·  '
-              '${chord.inversionLabel} in ${chordScale.label}'
+        ? l10n.diatonicChordCaption(
+            chord.romanNumeral,
+            l10n.chordQualityName(chord.quality),
+            l10n.inversionLabel(chord.inversion),
+            l10n.scaleLabel(chordScale),
+          )
         : chord.chromatic
-        ? '${chord.romanNumeral}  ·  ${chord.quality.label}  ·  '
-              '${chord.inversionLabel}  ·  chromatic'
-        : '${chord.quality.label}  ·  ${chord.inversionLabel}  ·  '
-              'chosen chord';
+        ? l10n.chromaticChordCaption(
+            chord.romanNumeral,
+            l10n.chordQualityName(chord.quality),
+            l10n.inversionLabel(chord.inversion),
+          )
+        : l10n.chosenChordCaption(
+            l10n.chordQualityName(chord.quality),
+            l10n.inversionLabel(chord.inversion),
+          );
     return Row(
       children: [
         PopupMenuButton<ChordQuality>(
           key: const Key('chord-menu'),
-          tooltip: 'Choose a chord',
+          tooltip: l10n.chooseChord,
           onSelected: onQualitySelected,
           itemBuilder: (context) => [
             for (final quality in kChordQualities)
@@ -3063,15 +3130,15 @@ class _KeyMenuEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final notes = musicalKey.signatureNotes;
-    final detail = notes.isEmpty
-        ? musicalKey.signatureLabel
-        : '${musicalKey.signatureLabel} \u00B7 $notes';
+    final signature = l10n.keySignatureLabel(musicalKey);
+    final detail = notes.isEmpty ? signature : '$signature \u00B7 $notes';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(musicalKey.label),
+        Text(l10n.keyName(musicalKey)),
         Text(
           detail,
           style: theme.textTheme.bodySmall?.copyWith(

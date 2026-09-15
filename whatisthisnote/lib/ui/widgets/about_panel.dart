@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_language.dart';
 import '../../core/display_preferences.dart';
+import '../../l10n/l10n.dart';
 import 'display_settings.dart';
 
 /// Links shown in the About tab.
@@ -12,8 +14,8 @@ const String kEmail = 'the@tragichero.win';
 const String kBravuraUrl = 'https://github.com/steinbergmedia/bravura';
 
 /// The app's release version. Keep this in step with `version:` in pubspec.yaml
-/// (`0.2.0+1` means the displayed version here is `0.2`).
-const String kAppVersion = '0.2';
+/// (`0.3.0+1` means the displayed version here is `0.3`).
+const String kAppVersion = '0.3';
 
 /// Adds the bundled Bravura music font to the open-source license list.
 ///
@@ -31,8 +33,8 @@ void registerBravuraLicense() {
   });
 }
 
-/// The About tab: the display and theme preferences moved out of the app bar,
-/// plus the project, feedback and open-source details.
+/// The About tab: the display, language and theme preferences moved out of the
+/// app bar, plus the project, feedback and open-source details.
 class AboutPanel extends StatelessWidget {
   const AboutPanel({
     super.key,
@@ -55,13 +57,12 @@ class AboutPanel extends StatelessWidget {
   }
 
   void _showLicenses(BuildContext context) {
+    final l10n = context.l10n;
     showLicensePage(
       context: context,
-      applicationName: 'What is this note?',
+      applicationName: l10n.appTitle,
       applicationVersion: kAppVersion,
-      applicationLegalese:
-          'Bravura music font \u00A9 Steinberg Media Technologies GmbH, '
-          'SIL Open Font License 1.1.',
+      applicationLegalese: l10n.licenseLegalese,
     );
   }
 
@@ -69,6 +70,7 @@ class AboutPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = context.l10n;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
@@ -81,7 +83,7 @@ class AboutPanel extends StatelessWidget {
               Icon(Icons.music_note, size: 48, color: scheme.primary),
               const SizedBox(height: 8),
               Text(
-                'What is this note?',
+                l10n.appTitle,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -89,8 +91,7 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Learn to read music by dragging a note around the staff. '
-                'Ledger lines, key signatures and note names update as you go.',
+                l10n.aboutTagline,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
@@ -98,7 +99,7 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Version $kAppVersion',
+                l10n.versionLabel(kAppVersion),
                 key: const Key('about-version'),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.labelMedium?.copyWith(
@@ -107,22 +108,31 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              _Section(title: 'Display'),
+              _Section(title: l10n.sectionDisplay),
               DisplaySettings(
                 preferences: display,
                 onChanged: onDisplayChanged,
               ),
               const SizedBox(height: 24),
 
-              _Section(title: 'Theme'),
+              _Section(title: l10n.sectionTheme),
               const SizedBox(height: 8),
               SegmentedButton<ThemeMode>(
                 key: const Key('theme-mode'),
                 showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: ThemeMode.system, label: Text('System')),
-                  ButtonSegment(value: ThemeMode.light, label: Text('Light')),
-                  ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+                segments: [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    label: Text(l10n.themeSystem),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    label: Text(l10n.themeLight),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    label: Text(l10n.themeDark),
+                  ),
                 ],
                 selected: {themeMode},
                 onSelectionChanged: (selection) =>
@@ -130,67 +140,96 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              _Section(title: 'Feedback'),
+              _Section(title: l10n.sectionLanguage),
               const SizedBox(height: 8),
-              Text(
-                'This app is made by a beginner, not a music teacher. If '
-                'something here does not make sense, or is simply wrong, '
-                'please open an issue or drop me an email. Feature requests are welcome too, as long as '
-                'they help you read notes, understand chords, or find a note '
-                'or a sound. It is a companion for learning and practising, '
-                'not a tool for composing or producing music.',
-                style: theme.textTheme.bodyMedium,
+              _LanguagePicker(
+                value: display.language,
+                onChanged: (language) =>
+                    onDisplayChanged(display.copyWith(language: language)),
               ),
+              const SizedBox(height: 24),
+
+              _Section(title: l10n.sectionFeedback),
+              const SizedBox(height: 8),
+              Text(l10n.aboutFeedbackBody, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 8),
               _LinkTile(
                 key: const Key('about-github'),
                 icon: Icons.code,
-                title: 'GitHub repository',
+                title: l10n.aboutGithub,
                 subtitle: kRepoUrl,
                 onTap: () => _open(kRepoUrl),
               ),
               _LinkTile(
                 key: const Key('about-email'),
                 icon: Icons.mail_outline,
-                title: 'Email',
+                title: l10n.aboutEmail,
                 subtitle: kEmail,
                 onTap: () => _open('mailto:$kEmail'),
               ),
               _LinkTile(
                 key: const Key('about-web'),
                 icon: Icons.public,
-                title: 'Web version',
+                title: l10n.aboutWeb,
                 subtitle: 'note.tragichero.win',
                 onTap: () => _open(kWebUrl),
               ),
               const SizedBox(height: 24),
 
-              _Section(title: 'Open source'),
+              _Section(title: l10n.sectionOpenSource),
               const SizedBox(height: 8),
-              Text(
-                'This app is built with Flutter, an open-source UI toolkit, '
-                'and reads the bundled Bravura music font.',
-                style: theme.textTheme.bodyMedium,
-              ),
+              Text(l10n.aboutOpenSourceBody, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 8),
               _LinkTile(
                 key: const Key('about-bravura'),
                 icon: Icons.text_fields,
-                title: 'Bravura music font',
+                title: l10n.aboutBravura,
                 subtitle: 'SIL Open Font License 1.1',
                 onTap: () => _open(kBravuraUrl),
               ),
               _LinkTile(
                 key: const Key('about-licenses'),
                 icon: Icons.article_outlined,
-                title: 'Open-source licenses',
-                subtitle: 'Flutter, packages and Bravura',
+                title: l10n.aboutLicenses,
+                subtitle: l10n.aboutLicensesSubtitle,
                 onTap: () => _showLicenses(context),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// A compact language selector: the system default, or a fixed language.
+class _LanguagePicker extends StatelessWidget {
+  const _LanguagePicker({required this.value, required this.onChanged});
+
+  final AppLanguage value;
+  final ValueChanged<AppLanguage> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return DropdownButton<AppLanguage>(
+      key: const Key('language-picker'),
+      value: value,
+      isExpanded: true,
+      onChanged: (language) {
+        if (language != null) onChanged(language);
+      },
+      items: [
+        for (final language in AppLanguage.values)
+          DropdownMenuItem<AppLanguage>(
+            value: language,
+            child: Text(
+              language == AppLanguage.system
+                  ? l10n.languageSystem
+                  : language.nativeName,
+            ),
+          ),
+      ],
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
 import '../../core/staff_geometry.dart';
+import '../../l10n/l10n.dart';
 import '../painters/notation_painter.dart';
 
 /// An interactive staff. The note can be dragged vertically to change its
@@ -249,6 +250,7 @@ class _StaffViewState extends State<StaffView>
         _noteX = _clampNoteX(geometry, _noteX);
 
         final scheme = Theme.of(context).colorScheme;
+        final l10n = context.l10n;
         final staff = RepaintBoundary(
           child: CustomPaint(
             size: Size.infinite,
@@ -265,6 +267,7 @@ class _StaffViewState extends State<StaffView>
               showLabel: widget.showLabel,
               naming: widget.naming,
               showEnharmonic: widget.showEnharmonic,
+              solfegeName: l10n.solfegeFor,
               chordSteps: widget.chordSteps,
               chordColor: scheme.tertiary,
               targetStep: widget.targetStep,
@@ -281,8 +284,8 @@ class _StaffViewState extends State<StaffView>
           return Semantics(
             image: true,
             label: widget.semanticValue == null
-                ? 'Note staff'
-                : 'Note staff, ${widget.semanticValue}',
+                ? l10n.noteStaff
+                : l10n.noteStaffValue(widget.semanticValue!),
             child: staff,
           );
         }
@@ -293,7 +296,7 @@ class _StaffViewState extends State<StaffView>
           onKeyEvent: _onKeyEvent,
           child: Semantics(
             container: true,
-            label: 'Note staff',
+            label: l10n.noteStaff,
             value: value,
             increasedValue: value == null
                 ? null
@@ -301,10 +304,7 @@ class _StaffViewState extends State<StaffView>
             decreasedValue: value == null
                 ? null
                 : _semanticNameAt(widget.step - 1),
-            hint:
-                'Drag up or down to change the pitch, or tap a line to jump '
-                'there. Use the arrow keys on a keyboard, or press space to '
-                'hear the note.',
+            hint: l10n.staffHint,
             onIncrease: value == null ? null : () => _nudge(1),
             onDecrease: value == null ? null : () => _nudge(-1),
             child: GestureDetector(

@@ -712,6 +712,16 @@ class Chord {
 
   Set<int> get pitchClassSet => pitchClasses.toSet();
 
+  /// Each chord tone's pitch class mapped to its spelled name, e.g.
+  /// `{0: 'C', 4: 'E', 7: 'G', 11: 'B'}` for Cmaj7.
+  Map<int, String> get pitchClassNames {
+    final result = <int, String>{};
+    for (var i = 0; i < intervals.length; i++) {
+      result[(rootPitchClass + intervals[i]) % 12] = noteNames[i];
+    }
+    return result;
+  }
+
   /// Pitch class of the lowest sounding note.
   int get bassPitchClass => pitchClasses.first;
 

@@ -1,13 +1,7 @@
+import 'app_language.dart';
+
 /// The naming system used for note names in the readout and on the staff.
-enum NamingSystem {
-  scientific('Scientific'),
-  solfege('Solfege'),
-  jianpu('Numbered');
-
-  const NamingSystem(this.label);
-
-  final String label;
-}
+enum NamingSystem { scientific, solfege, jianpu }
 
 /// User-configurable display preferences.
 ///
@@ -19,6 +13,7 @@ class DisplayPreferences {
     this.naming = NamingSystem.scientific,
     this.showStaffLabel = true,
     this.showEnharmonic = false,
+    this.language = AppLanguage.system,
   });
 
   /// Which name is shown first in the readout and next to the note.
@@ -30,14 +25,19 @@ class DisplayPreferences {
   /// Whether to also show the enharmonic spelling (F♯ ~ G♭).
   final bool showEnharmonic;
 
+  /// The app language, or [AppLanguage.system] to follow the device.
+  final AppLanguage language;
+
   DisplayPreferences copyWith({
     NamingSystem? naming,
     bool? showStaffLabel,
     bool? showEnharmonic,
+    AppLanguage? language,
   }) => DisplayPreferences(
     naming: naming ?? this.naming,
     showStaffLabel: showStaffLabel ?? this.showStaffLabel,
     showEnharmonic: showEnharmonic ?? this.showEnharmonic,
+    language: language ?? this.language,
   );
 
   @override
@@ -45,8 +45,10 @@ class DisplayPreferences {
       other is DisplayPreferences &&
       other.naming == naming &&
       other.showStaffLabel == showStaffLabel &&
-      other.showEnharmonic == showEnharmonic;
+      other.showEnharmonic == showEnharmonic &&
+      other.language == language;
 
   @override
-  int get hashCode => Object.hash(naming, showStaffLabel, showEnharmonic);
+  int get hashCode =>
+      Object.hash(naming, showStaffLabel, showEnharmonic, language);
 }
