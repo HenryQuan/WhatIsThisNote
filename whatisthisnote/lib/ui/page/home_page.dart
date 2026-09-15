@@ -17,8 +17,8 @@ import '../../core/note.dart';
 import '../../core/quiz.dart';
 import '../../core/scale.dart';
 import '../../core/staff_geometry.dart';
+import '../widgets/about_panel.dart';
 import '../widgets/chord_builder_panel.dart';
-import '../widgets/display_settings_sheet.dart';
 import '../widgets/metronome_panel.dart';
 import '../widgets/piano_keyboard.dart';
 import '../widgets/staff_view.dart';
@@ -47,7 +47,7 @@ const double _clickAccentHz = 1318.51;
 const double _clickBeatHz = 880.0;
 
 /// Top-level destinations of the app.
-enum _HomeTab { note, practice, metronome, chords }
+enum _HomeTab { note, practice, metronome, chords, about }
 
 extension on _HomeTab {
   String get label => switch (this) {
@@ -55,6 +55,7 @@ extension on _HomeTab {
     _HomeTab.practice => 'Practice',
     _HomeTab.metronome => 'Metronome',
     _HomeTab.chords => 'Chords',
+    _HomeTab.about => 'About',
   };
 
   IconData get icon => switch (this) {
@@ -62,6 +63,7 @@ extension on _HomeTab {
     _HomeTab.practice => Icons.quiz,
     _HomeTab.metronome => Icons.av_timer,
     _HomeTab.chords => Icons.queue_music,
+    _HomeTab.about => Icons.info_outline,
   };
 }
 
@@ -349,18 +351,6 @@ class _HomePageState extends State<HomePage> {
     _playbackTimer = Timer(
       _sequenceStepGap,
       () => unawaited(_playSequenceStep(token, kind, index + 1)),
-    );
-  }
-
-  void _openDisplaySettings() {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => DisplaySettingsSheet(
-        preferences: widget.display,
-        onChanged: widget.onDisplayChanged,
-      ),
     );
   }
 
@@ -1083,7 +1073,6 @@ class _HomePageState extends State<HomePage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          actions: _tab == _HomeTab.note ? _appBarActions : null,
         ),
         body: SafeArea(
           child: LayoutBuilder(
@@ -1292,9 +1281,17 @@ class _HomePageState extends State<HomePage> {
                     onChanged: (key) => setState(() => _key = key),
                   ),
                 ),
+                _HomeTab.about => AboutPanel(
+                  themeMode: widget.themeMode,
+                  onThemeModeChanged: widget.onThemeModeChanged,
+                  display: widget.display,
+                  onDisplayChanged: widget.onDisplayChanged,
+                ),
               };
 
-              if (_tab == _HomeTab.metronome || _tab == _HomeTab.chords) {
+              if (_tab == _HomeTab.metronome ||
+                  _tab == _HomeTab.chords ||
+                  _tab == _HomeTab.about) {
                 return _withNavigation(constraints.maxWidth, panel);
               }
 
@@ -1361,35 +1358,6 @@ class _HomePageState extends State<HomePage> {
       ],
     );
   }
-
-  List<Widget> get _appBarActions => [
-    IconButton(
-      key: const Key('display-settings'),
-      tooltip: 'Display',
-      icon: const Icon(Icons.tune),
-      onPressed: _openDisplaySettings,
-    ),
-    PopupMenuButton<ThemeMode>(
-      tooltip: 'Theme',
-      icon: Icon(_themeIcon(widget.themeMode)),
-      initialValue: widget.themeMode,
-      onSelected: widget.onThemeModeChanged,
-      itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: ThemeMode.system,
-          child: _ThemeOption(icon: Icons.brightness_auto, label: 'System'),
-        ),
-        PopupMenuItem(
-          value: ThemeMode.light,
-          child: _ThemeOption(icon: Icons.light_mode, label: 'Light'),
-        ),
-        PopupMenuItem(
-          value: ThemeMode.dark,
-          child: _ThemeOption(icon: Icons.dark_mode, label: 'Dark'),
-        ),
-      ],
-    ),
-  ];
 
   /// Which activity the Practice tab is currently showing.
   _PracticeActivity get _activity => _guided
@@ -1465,17 +1433,6 @@ class _HomePageState extends State<HomePage> {
         ),
     ],
   );
-
-  IconData _themeIcon(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.dark:
-        return Icons.dark_mode;
-      case ThemeMode.light:
-        return Icons.light_mode;
-      case ThemeMode.system:
-        return Icons.brightness_auto;
-    }
-  }
 }
 
 /// The draggable divider between the staff and the controls rail. Dragging it
@@ -3037,17 +2994,5 @@ class _MenuHeader extends StatelessWidget {
         fontWeight: FontWeight.bold,
       ),
     );
-  }
-}
-
-class _ThemeOption extends StatelessWidget {
-  const _ThemeOption({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [Icon(icon), const SizedBox(width: 12), Text(label)]);
   }
 }

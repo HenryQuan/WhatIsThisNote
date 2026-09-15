@@ -8,13 +8,17 @@ import 'core/display_preferences_store.dart';
 import 'core/onboarding.dart';
 import 'ui/page/home_page.dart';
 import 'ui/theme.dart';
+import 'ui/widgets/about_panel.dart';
 
-void main() => runApp(
-  WhatIsThisNoteApp(
-    onboardingStore: SharedPreferencesOnboardingStore(),
-    displayPreferencesStore: SharedPreferencesDisplayPreferencesStore(),
-  ),
-);
+void main() {
+  registerBravuraLicense();
+  runApp(
+    WhatIsThisNoteApp(
+      onboardingStore: SharedPreferencesOnboardingStore(),
+      displayPreferencesStore: SharedPreferencesDisplayPreferencesStore(),
+    ),
+  );
+}
 
 class WhatIsThisNoteApp extends StatefulWidget {
   const WhatIsThisNoteApp({

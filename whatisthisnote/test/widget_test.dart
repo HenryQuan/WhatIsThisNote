@@ -896,9 +896,19 @@ void main() {
   testWidgets('the dark theme renders the staff', (tester) async {
     await tester.pumpWidget(const WhatIsThisNoteApp());
 
-    await tester.tap(find.byTooltip('Theme'));
+    await tester.tap(find.byTooltip('About'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Dark').last);
+    await tester.ensureVisible(find.text('Dark'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.dark,
+    );
+
+    await tester.tap(find.byTooltip('Note'));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -1070,9 +1080,11 @@ void main() {
   testWidgets('display settings switch the naming system', (tester) async {
     await tester.pumpWidget(const WhatIsThisNoteApp());
 
-    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.tap(find.byTooltip('About'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Solfege'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Note'));
     await tester.pumpAndSettle();
 
     expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'Si');
@@ -1089,9 +1101,11 @@ void main() {
     await tester.pumpWidget(const WhatIsThisNoteApp());
     expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isTrue);
 
-    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.tap(find.byTooltip('About'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('toggle-staff-label')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Note'));
     await tester.pumpAndSettle();
 
     expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isFalse);
@@ -1114,9 +1128,11 @@ void main() {
     );
     expect(find.byKey(const Key('note-enharmonic')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.tap(find.byTooltip('About'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('toggle-enharmonic')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Note'));
     await tester.pumpAndSettle();
 
     expect(
@@ -1205,7 +1221,7 @@ void main() {
     await tester.pumpWidget(const WhatIsThisNoteApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.tap(find.byTooltip('About'));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -1269,7 +1285,7 @@ void main() {
     await tester.pumpWidget(WhatIsThisNoteApp(displayPreferencesStore: store));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('display-settings')));
+    await tester.tap(find.byTooltip('About'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Numbered'));
     await tester.pumpAndSettle();
