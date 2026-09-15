@@ -22,7 +22,7 @@
   "reset": "Zurücksetzen",
   "nextNote": "Nächste Note",
   "off": "Aus",
-  "skip": "Überspringen",
+  "skip": "Weiter",
 
   "onboardingSemantics": "Einführung. Ziehe die Note nach oben oder unten, um die Tonhöhe zu ändern, oder tippe auf eine Linie, um dorthin zu springen.",
   "onboardingBody": "Ziehe die Note nach oben oder unten, um die Tonhöhe zu ändern. Tippe auf eine Linie, um dorthin zu springen.",
@@ -41,7 +41,7 @@
   "practiceWrong": "Nicht ganz. Es ist {answer}.",
 
   "readTitle": "Spielen",
-  "readExit": "Spielen verlassen",
+  "readExit": "Beenden",
   "readPhraseComplete": "Phrase abgeschlossen.",
   "readTryAgain": "Nicht ganz — versuche die nächste Note erneut.",
   "readPrompt": "Spiele die Noten im Notensystem von links nach rechts.",
@@ -51,7 +51,7 @@
 
   "jianpuHint": "1 = Do ... 8 = Do",
   "scaleDegree": "Stufe {degree}",
-  "outsideScale": "außerhalb der Tonleiter",
+  "outsideScale": "außerhalb",
   "playScale": "Hervorgehobene Tonleiter spielen",
   "playProgression": "Akkordfolge abspielen",
   "playNote": "Note spielen",
@@ -63,7 +63,7 @@
   "major": "Dur",
   "minor": "Moll",
   "keyMenuLabel": "Tonart: {key}",
-  "scaleHighlight": "Tonleiter-Hervorhebung",
+  "scaleHighlight": "Tonleiter zeigen",
   "highlightLabel": "Hervorhebung: {label}",
   "chordsTitle": "Akkorde",
   "chordsLabel": "Akkorde: {label}",
@@ -129,8 +129,8 @@
   "buildAChord": "Akkord bilden",
   "clearAll": "Alles löschen",
   "builderHint": "Tippe auf das Notensystem, um eine Note hinzuzufügen, und ziehe sie dann oder verwende die Pfeile. Tippe auf einen Akkord unten, um seine Noten hervorzuheben.",
-  "addAbove": "Oben hinzufügen",
-  "addBelow": "Unten hinzufügen",
+  "addAbove": "Nach oben",
+  "addBelow": "Nach unten",
   "notesCount": "{count} von {max} Noten",
   "moveNoteUp": "Ausgewählte Note nach oben verschieben",
   "moveNoteDown": "Ausgewählte Note nach unten verschieben",
@@ -142,7 +142,7 @@
   "addedTones": "Hinzugefügt: {tones}",
   "missingTones": "Fehlend: {tones}",
   "roleWithBass": "{role} ({bass} im Bass)",
-  "bestMatch": "Beste Übereinstimmung",
+  "bestMatch": "Beste Option",
   "chordStaff": "Akkord-Notensystem",
   "chordStaffHint": "Tippe, um eine Note hinzuzufügen; ziehe eine Note nach oben oder unten, um sie zu ändern.",
 
@@ -171,7 +171,7 @@
   "namingTitle": "Notennamen",
   "namingScientific": "Wissenschaftlich",
   "namingSolfege": "Solfege",
-  "namingJianpu": "Ziffernnotation",
+  "namingJianpu": "Ziffern",
   "noteNameOnStaff": "Notenname im Notensystem",
   "enharmonicEquivalent": "Enharmonische Verwechslung",
 
@@ -298,7 +298,7 @@
   "solfegeA": "La",
   "solfegeB": "Si",
 
-  "inversionShortRoot": "Grundstellung",
+  "inversionShortRoot": "Grund",
   "inversionShort1st": "1. Umk.",
   "inversionShort2nd": "2. Umk.",
   "inversionShort3rd": "3. Umk."
