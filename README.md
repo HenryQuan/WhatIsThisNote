@@ -55,9 +55,10 @@ seven-note scales; it falls back to the key's major or natural minor scale and
 shows no chord for chromatic notes. The play button sounds the written note,
 or the chord's tones when the chord lab is on. Tones are synthesized in Dart
 and played through `audioplayers`, which works on Android, iOS, web, Windows,
-macOS and Linux. Progressions are selected and tapped rather than played as a
-sequence. Sharps and flats in the guided path come from key signatures, so the
-path does not yet show accidentals that are not in the key.
+macOS and Linux. A progression is selected and tapped, then played as a
+sequence with its play button. Sharps and flats in the guided path come from
+key signatures, so the path does not yet show accidentals that are not in the
+key.
 
 ## Getting started
 
