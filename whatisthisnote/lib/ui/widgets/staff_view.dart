@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/accidental.dart';
 import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
@@ -19,6 +20,8 @@ class StaffView extends StatefulWidget {
     required this.onStepChanged,
     this.chordSteps = const [],
     this.targetStep,
+    this.accidental,
+    this.targetAccidental,
     this.melodySteps = const [],
     this.melodyIndex = 0,
     this.minStep = -6,
@@ -42,6 +45,13 @@ class StaffView extends StatefulWidget {
   /// Optional staff step to hint at, drawn as a hollow target notehead (used by
   /// the guided theory path).
   final int? targetStep;
+
+  /// Accidental to write on the note, overriding the key signature. `null`
+  /// uses the key's accidental for the note's letter.
+  final Accidental? accidental;
+
+  /// Accidental to write on the hollow [targetStep] notehead.
+  final Accidental? targetAccidental;
 
   /// Staff steps of a phrase to draw left to right (used by read-and-play).
   /// Empty for the normal single note.
@@ -139,7 +149,11 @@ class _StaffViewState extends State<StaffView>
   /// `increasedValue`/`decreasedValue` that assistive tech announces.
   String _semanticNameAt(int step) {
     final clamped = step.clamp(widget.minStep, widget.maxStep);
-    return widget.keySignature.applyTo(widget.clef.noteAt(clamped)).name;
+    var note = widget.keySignature.applyTo(widget.clef.noteAt(clamped));
+    if (clamped == widget.step && widget.accidental != null) {
+      note = note.withAccidental(widget.accidental!);
+    }
+    return note.name;
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
@@ -254,6 +268,8 @@ class _StaffViewState extends State<StaffView>
               chordSteps: widget.chordSteps,
               chordColor: scheme.tertiary,
               targetStep: widget.targetStep,
+              targetAccidental: widget.targetAccidental,
+              accidental: widget.accidental,
               targetColor: scheme.outline,
               melodySteps: widget.melodySteps,
               melodyIndex: widget.melodyIndex,

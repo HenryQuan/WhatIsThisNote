@@ -219,7 +219,7 @@ class _HomePageState extends State<HomePage> {
   /// Plays whatever is currently shown, including the chord-lab voicing.
   Future<void> _playCurrent({Duration? duration}) {
     final scale = _selectedScale;
-    final note = _key.applyTo(_clef.noteAt(_step));
+    final note = _writtenNote;
     return _playSound(
       note,
       _chordFor(_chordScale(scale), note),
@@ -485,6 +485,24 @@ class _HomePageState extends State<HomePage> {
   int? get _guidedTarget {
     if (!_guided || !_lessonStep.isPractice) return null;
     return _step == _lessonStep.targetStep ? null : _lessonStep.targetStep;
+  }
+
+  /// The accidental written on the guided note at [step], or `null` to use the
+  /// key signature. The practice target's accidental applies once the learner
+  /// reaches it.
+  Accidental? _guidedAccidentalAt(int step) {
+    if (!_guided) return null;
+    final lesson = _lessonStep;
+    if (lesson.targetStep == step) return lesson.targetAccidental;
+    if (lesson.step == step) return lesson.accidental;
+    return null;
+  }
+
+  /// The note currently written on the staff, including any guided accidental.
+  Note get _writtenNote {
+    final note = _key.applyTo(_clef.noteAt(_step));
+    final accidental = _guidedAccidentalAt(_step);
+    return accidental == null ? note : note.withAccidental(accidental);
   }
 
   /// Applies a lesson step to the staff, turning the add-ons off so the path
@@ -1080,7 +1098,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final scale = _selectedScale;
     final chordScale = _chordScale(scale);
-    final note = _key.applyTo(_clef.noteAt(_step));
+    final note = _writtenNote;
     final chord = _chordFor(chordScale, note);
     final practiceActive = _tab == _HomeTab.practice && _practice;
     final guidedActive = _tab == _HomeTab.practice && _guided;
@@ -1139,6 +1157,12 @@ class _HomePageState extends State<HomePage> {
                         : const [],
                     melodyIndex: _melodyIndex,
                     targetStep: guidedActive ? _guidedTarget : null,
+                    targetAccidental: guidedActive
+                        ? _lessonStep.targetAccidental
+                        : null,
+                    accidental: guidedActive
+                        ? _guidedAccidentalAt(_step)
+                        : null,
                     showLabel:
                         widget.display.showStaffLabel &&
                         !readActive &&

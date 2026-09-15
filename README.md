@@ -48,7 +48,9 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
       (I-V-vi-IV, ii-V-I, canon, Andalusian)
 - [x] Guided theory path: short lessons on the staff, its lines and spaces, the
       bass clef and sharps/flats. Each lesson explains a little and then asks
-      you to drag the note to a target, drawn as a hollow notehead
+      you to drag the note to a target, drawn as a hollow notehead. Accidentals
+      outside the key (sharps, flats and naturals) are written on the note and
+      on the target
 
 The chord lab works from the note's scale degree and only builds chords on
 seven-note scales; it falls back to the key's major or natural minor scale and
@@ -56,9 +58,8 @@ shows no chord for chromatic notes. The play button sounds the written note,
 or the chord's tones when the chord lab is on. Tones are synthesized in Dart
 and played through `audioplayers`, which works on Android, iOS, web, Windows,
 macOS and Linux. A progression is selected and tapped, then played as a
-sequence with its play button. Sharps and flats in the guided path come from
-key signatures, so the path does not yet show accidentals that are not in the
-key.
+sequence with its play button. The guided path can write sharps, flats and
+naturals that are not in the key on the note and on the practice target.
 
 ## Getting started
 

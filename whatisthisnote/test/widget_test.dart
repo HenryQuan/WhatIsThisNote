@@ -3,11 +3,13 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:whatisthisnote/audio/note_player.dart';
+import 'package:whatisthisnote/core/accidental.dart';
 import 'package:whatisthisnote/core/chord.dart';
 import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/display_preferences.dart';
 import 'package:whatisthisnote/core/metronome.dart';
 import 'package:whatisthisnote/core/display_preferences_store.dart';
+import 'package:whatisthisnote/core/key.dart';
 import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 import 'package:whatisthisnote/main.dart';
@@ -1049,6 +1051,67 @@ void main() {
       tester.widget<Text>(find.byKey(const Key('guided-status'))).data,
       contains('Well done'),
     );
+  });
+
+  testWidgets('the staff writes an accidental outside the key', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 400,
+              height: 300,
+              child: StaffView(
+                clef: Clef.treble,
+                keySignature: const MusicalKey('C', KeyMode.major, 0),
+                step: 8,
+                accidental: Accidental.sharp,
+                onStepChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final painter = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((custom) => custom.painter)
+        .whereType<NotationPainter>()
+        .single;
+    expect(painter.accidental, Accidental.sharp);
+    expect(painter.labelNoteName, 'F\u266F');
+  });
+
+  testWidgets('the practice target carries its own accidental', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 400,
+              height: 300,
+              child: StaffView(
+                clef: Clef.treble,
+                keySignature: const MusicalKey('G', KeyMode.major, 1),
+                step: 4,
+                targetStep: 8,
+                targetAccidental: Accidental.natural,
+                onStepChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final painter = tester
+        .widgetList<CustomPaint>(find.byType(CustomPaint))
+        .map((custom) => custom.painter)
+        .whereType<NotationPainter>()
+        .single;
+    expect(painter.targetStep, 8);
+    expect(painter.targetAccidental, Accidental.natural);
   });
 
   testWidgets('the dark theme renders the staff', (tester) async {

@@ -3,9 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/accidental.dart';
 import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
+import '../../core/note.dart';
 import '../../core/staff_geometry.dart';
 import '../notation_glyphs.dart';
 
@@ -30,6 +32,8 @@ class NotationPainter extends CustomPainter {
     this.chordColor = const Color(0xFF000000),
     this.targetStep,
     this.targetColor,
+    this.accidental,
+    this.targetAccidental,
     this.melodySteps = const [],
     this.melodyIndex = 0,
     this.melodyActiveColor = const Color(0xFF000000),
@@ -69,6 +73,13 @@ class NotationPainter extends CustomPainter {
   /// Colour of the hollow target notehead. Defaults to [noteColor].
   final Color? targetColor;
 
+  /// Accidental written on the note, overriding the key signature. `null` uses
+  /// the key's accidental for the note's letter.
+  final Accidental? accidental;
+
+  /// Accidental written on the hollow [targetStep] notehead.
+  final Accidental? targetAccidental;
+
   /// Staff steps of a phrase drawn left to right. Empty for a single note.
   final List<int> melodySteps;
 
@@ -83,10 +94,29 @@ class NotationPainter extends CustomPainter {
   /// chord is shown, otherwise the written note.
   int get labelStep => chordSteps.isEmpty ? step.round() : chordSteps.first;
 
+  /// The note written at [step], taking the explicit [override] into account.
+  Note _writtenNote(int step, Accidental? override) {
+    final note = key.applyTo(clef.noteAt(step));
+    return override == null ? note : note.withAccidental(override);
+  }
+
+  /// Whether [note] needs a printed accidental because it differs from what the
+  /// key signature already implies for its letter.
+  bool _needsAccidental(Note note) =>
+      note.accidental != key.accidentalFor(note.letter);
+
+  /// The note the label describes, including any explicit accidental.
+  Note get _labelNote {
+    if (chordSteps.isEmpty && accidental != null) {
+      return key.applyTo(clef.noteAt(labelStep)).withAccidental(accidental!);
+    }
+    return key.applyTo(clef.noteAt(labelStep));
+  }
+
   /// Name shown by the label next to the note (or the chord bass), using the
   /// selected naming system.
   String get labelNoteName {
-    final note = key.applyTo(clef.noteAt(labelStep));
+    final note = _labelNote;
     switch (naming) {
       case NamingSystem.scientific:
         return note.pitchName;
@@ -100,7 +130,7 @@ class NotationPainter extends CustomPainter {
   /// Full text drawn in the label: the name, plus the enharmonic spelling when
   /// that preference is on.
   String get labelText {
-    final note = key.applyTo(clef.noteAt(labelStep));
+    final note = _labelNote;
     final twin = showEnharmonic ? note.enharmonic?.pitchName : null;
     return twin == null ? labelNoteName : '$labelNoteName/$twin';
   }
@@ -240,17 +270,38 @@ class NotationPainter extends CustomPainter {
   void _paintTarget(Canvas canvas) {
     final target = targetStep;
     if (target == null || target == step.round()) return;
+    final color = targetColor ?? noteColor;
     final notehead = _layoutGlyph(
       NotationGlyphs.noteheadWhole,
       geometry.space * 4,
-      targetColor ?? noteColor,
+      color,
     );
-    _paintGlyph(
-      canvas,
-      notehead,
-      centerX: noteX,
-      baselineY: geometry.yForStep(target.toDouble()),
-    );
+    final targetY = geometry.yForStep(target.toDouble());
+    final note = _writtenNote(target, targetAccidental);
+    if (_needsAccidental(note)) {
+      _paintAccidental(
+        canvas,
+        note.accidental,
+        targetY,
+        noteX - notehead.width / 2,
+        color,
+      );
+    }
+    _paintGlyph(canvas, notehead, centerX: noteX, baselineY: targetY);
+  }
+
+  /// Draws an accidental glyph just left of a notehead centred at [noteX] and
+  /// [noteY], so a note can show a sharp, flat or natural outside the key.
+  void _paintAccidental(
+    Canvas canvas,
+    Accidental accidental,
+    double noteY,
+    double noteLeft,
+    Color color,
+  ) {
+    final glyph = _layoutGlyph(accidental.glyph, geometry.space * 4, color);
+    final x = noteLeft - geometry.space * 0.08 - glyph.width;
+    _paintGlyph(canvas, glyph, x: x, baselineY: noteY);
   }
 
   void _paintNote(Canvas canvas) {
@@ -275,6 +326,17 @@ class NotationPainter extends CustomPainter {
       Offset(stemX, noteY + (stemUp ? -stemLength : stemLength)),
       stemPaint,
     );
+
+    final note = _writtenNote(step.round(), accidental);
+    if (_needsAccidental(note)) {
+      _paintAccidental(
+        canvas,
+        note.accidental,
+        noteY,
+        noteX - headHalfWidth,
+        noteColor,
+      );
+    }
 
     _paintGlyph(canvas, notehead, centerX: noteX, baselineY: noteY);
   }
@@ -402,6 +464,8 @@ class NotationPainter extends CustomPainter {
         old.chordColor != chordColor ||
         old.targetStep != targetStep ||
         old.targetColor != targetColor ||
+        old.accidental != accidental ||
+        old.targetAccidental != targetAccidental ||
         !listEquals(old.melodySteps, melodySteps) ||
         old.melodyIndex != melodyIndex ||
         old.melodyActiveColor != melodyActiveColor;

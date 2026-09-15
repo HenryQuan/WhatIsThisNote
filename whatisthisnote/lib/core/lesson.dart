@@ -1,3 +1,4 @@
+import 'accidental.dart';
 import 'clef.dart';
 import 'key.dart';
 
@@ -15,6 +16,8 @@ class LessonStep {
     required this.step,
     this.kind = LessonStepKind.explain,
     this.targetStep,
+    this.accidental,
+    this.targetAccidental,
   });
 
   final String title;
@@ -29,6 +32,15 @@ class LessonStep {
 
   /// Staff step the learner must drag the note to (practice steps only).
   final int? targetStep;
+
+  /// Accidental written on the note, overriding the key signature. `null` uses
+  /// the key's accidental for the note's letter, so lessons can introduce
+  /// sharps, flats and naturals outside the key.
+  final Accidental? accidental;
+
+  /// Accidental written on the hollow practice target, overriding the key
+  /// signature.
+  final Accidental? targetAccidental;
 
   bool get isPractice => kind == LessonStepKind.practice;
 }
@@ -167,6 +179,50 @@ const List<Lesson> kLessons = [
       step: 1,
       kind: LessonStepKind.practice,
       targetStep: 8,
+    ),
+  ]),
+  Lesson('Accidentals', [
+    LessonStep(
+      title: 'Sharp',
+      instruction:
+          'A sharp (\u266F) raises a note by a half step. This F cannot be '
+          'written in C major without a sign, so a sharp is printed in front '
+          'of it, making it F\u266F.',
+      clef: Clef.treble,
+      key: _cMajor,
+      step: 8,
+      accidental: Accidental.sharp,
+    ),
+    LessonStep(
+      title: 'Flat',
+      instruction:
+          'A flat (\u266D) lowers a note by a half step. This B becomes '
+          'B\u266D, with a flat sign in front of it.',
+      clef: Clef.treble,
+      key: _cMajor,
+      step: 4,
+      accidental: Accidental.flat,
+    ),
+    LessonStep(
+      title: 'Natural',
+      instruction:
+          'A natural (\u266E) cancels an earlier sharp or flat. In G major '
+          'the key signature makes every F sharp, so an F natural needs a '
+          'natural sign.',
+      clef: Clef.treble,
+      key: _gMajor,
+      step: 8,
+      accidental: Accidental.natural,
+    ),
+    LessonStep(
+      title: 'Your turn',
+      instruction: 'Drag the note up to F and make it F\u266F.',
+      clef: Clef.treble,
+      key: _cMajor,
+      step: 4,
+      kind: LessonStepKind.practice,
+      targetStep: 8,
+      targetAccidental: Accidental.sharp,
     ),
   ]),
 ];

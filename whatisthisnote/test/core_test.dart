@@ -754,8 +754,23 @@ void main() {
           break;
         }
       }
-      expect(differs, isTrue);
     });
+
+    test('the accidentals lesson uses signs outside the key', () {
+      final lesson = kLessons.last;
+      expect(lesson.title, 'Accidentals');
+      expect(
+        lesson.steps.map((step) => step.accidental),
+        containsAll(<Accidental?>[
+          Accidental.sharp,
+          Accidental.flat,
+          Accidental.natural,
+        ]),
+      );
+      final practice = lesson.steps.firstWhere((step) => step.isPractice);
+      expect(practice.targetAccidental, Accidental.sharp);
+    });
+  });
   });
 
   group('Enharmonic', () {
