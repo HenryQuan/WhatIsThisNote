@@ -11,6 +11,10 @@ const String kWebUrl = 'https://note.tragichero.win';
 const String kEmail = 'the@tragichero.win';
 const String kBravuraUrl = 'https://github.com/steinbergmedia/bravura';
 
+/// The app's release version. Keep this in step with `version:` in pubspec.yaml
+/// (`0.1.0+1` means the displayed version here is `0.1`).
+const String kAppVersion = '0.1';
+
 /// Adds the bundled Bravura music font to the open-source license list.
 ///
 /// Flutter registers the licenses of its own packages automatically; a font
@@ -54,6 +58,7 @@ class AboutPanel extends StatelessWidget {
     showLicensePage(
       context: context,
       applicationName: 'What is this note?',
+      applicationVersion: kAppVersion,
       applicationLegalese:
           'Bravura music font \u00A9 Steinberg Media Technologies GmbH, '
           'SIL Open Font License 1.1.',
@@ -91,6 +96,15 @@ class AboutPanel extends StatelessWidget {
                   color: scheme.onSurfaceVariant,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Version $kAppVersion',
+                key: const Key('about-version'),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 24),
 
               _Section(title: 'Display'),
@@ -121,7 +135,7 @@ class AboutPanel extends StatelessWidget {
               Text(
                 'This app is made by a beginner, not a music teacher. If '
                 'something here does not make sense, or is simply wrong, '
-                'please say so. Feature requests are welcome too, as long as '
+                'please open an issue or drop me an email. Feature requests are welcome too, as long as '
                 'they help you read notes, understand chords, or find a note '
                 'or a sound. It is a companion for learning and practising, '
                 'not a tool for composing or producing music.',

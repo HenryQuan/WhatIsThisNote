@@ -12,6 +12,8 @@ import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/staff_geometry.dart';
 import 'package:whatisthisnote/main.dart';
 import 'package:whatisthisnote/ui/painters/notation_painter.dart';
+import 'package:whatisthisnote/ui/widgets/about_panel.dart';
+import 'package:whatisthisnote/ui/widgets/chord_builder_panel.dart';
 import 'package:whatisthisnote/ui/widgets/piano_keyboard.dart';
 import 'package:whatisthisnote/ui/widgets/staff_view.dart';
 
@@ -285,11 +287,167 @@ void main() {
       await tester.pump();
     }
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('builder-play')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('builder-play')));
     await tester.pump();
 
     expect(player.played, hasLength(1));
     expect(player.played.single, hasLength(2));
+  });
+
+  testWidgets('a selected chord note drags from anywhere on the staff', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pumpAndSettle();
+
+    String chipLabel() =>
+        (tester.widget<InputChip>(find.byKey(const Key('builder-note-0'))).label
+                as Text)
+            .data!;
+    final before = chipLabel();
+
+    // Start the drag well away from the notehead: a selected note still moves.
+    final rect = tester.getRect(find.byType(ChordStaff));
+    await tester.dragFrom(
+      rect.center + const Offset(0, 40),
+      Offset(0, -rect.height * 0.3),
+    );
+    await tester.pumpAndSettle();
+
+    expect(chipLabel(), isNot(before));
+  });
+
+  testWidgets('the chords tab uses the tablet side-by-side layout', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.text('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChordStaff), findsOneWidget);
+    // The draggable divider between the staff and the controls rail.
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is MouseRegion &&
+            widget.cursor == SystemMouseCursors.resizeLeftRight,
+      ),
+      findsOneWidget,
+    );
+    final staffSize = tester.getSize(find.byType(ChordStaff));
+    expect(staffSize.width, lessThan(1000));
+    expect(staffSize.height, greaterThan(500));
+  });
+
+  testWidgets('the chords tab shows a keyboard below the staff', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pumpAndSettle();
+
+    final keyboardFinder = find.byKey(const Key('chord-keyboard'));
+    expect(keyboardFinder, findsOneWidget);
+    expect(
+      tester.getCenter(keyboardFinder).dy,
+      greaterThan(tester.getCenter(find.byType(ChordStaff)).dy),
+    );
+
+    // Both stacked notes light up on the keyboard.
+    final keyboard = tester.widget<PianoKeyboard>(keyboardFinder);
+    expect(keyboard.chordMidis, hasLength(2));
+  });
+
+  testWidgets('a high C lights the upper C on the chord keyboard', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap the staff at C5, step 5 in the treble clef.
+    final rect = tester.getRect(find.byType(ChordStaff));
+    final geometry = StaffGeometry.forSize(rect.size);
+    await tester.tapAt(Offset(rect.center.dx, rect.top + geometry.yForStep(5)));
+    await tester.pumpAndSettle();
+
+    final keyboard = tester.widget<PianoKeyboard>(
+      find.byKey(const Key('chord-keyboard')),
+    );
+    expect(keyboard.chordMidis, contains(72));
+    expect(keyboard.midiUpperOctave, isTrue);
+  });
+
+  testWidgets('the chord builder clears all notes', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('builder-note-0')), findsOneWidget);
+    expect(find.byKey(const Key('builder-note-1')), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('builder-clear')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('builder-clear')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('builder-note-0')), findsNothing);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('builder-count'))).data,
+      '0 of 8 notes',
+    );
   });
 
   testWidgets('shows a piano keyboard for the current note', (tester) async {
@@ -1097,6 +1255,18 @@ void main() {
     expect(painter.labelNoteName, 'Si');
   });
 
+  testWidgets('the about tab shows the release version', (tester) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+
+    await tester.tap(find.byTooltip('About'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Text>(find.byKey(const Key('about-version'))).data,
+      'Version $kAppVersion',
+    );
+  });
+
   testWidgets('display settings hide the on-staff note name', (tester) async {
     await tester.pumpWidget(const WhatIsThisNoteApp());
     expect(tester.widget<StaffView>(find.byType(StaffView)).showLabel, isTrue);
@@ -1376,6 +1546,56 @@ void main() {
     expect(player.played, hasLength(1));
     expect(player.played.single, hasLength(1));
     expect(player.played.single.single, closeTo(493.883, 0.01));
+  });
+
+  testWidgets('arrow keys do not change the note outside the Note tab', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(find.byTooltip('Practice'));
+    await tester.pumpAndSettle();
+
+    final before = tester.widget<StaffView>(find.byType(StaffView)).step;
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<StaffView>(find.byType(StaffView)).step, before);
+  });
+
+  testWidgets('arrow keys move the selected chord note and space plays it', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final player = _RecordingNotePlayer();
+    await tester.pumpWidget(WhatIsThisNoteApp(notePlayer: player));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pumpAndSettle();
+
+    String chipLabel(int index) =>
+        (tester.widget<InputChip>(find.byKey(Key('builder-note-$index'))).label
+                as Text)
+            .data!;
+
+    final before = chipLabel(1);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(chipLabel(1), isNot(before));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(player.played, hasLength(1));
+    expect(player.played.single, hasLength(2));
   });
 
   testWidgets('a wide window packs the controls and grows the staff', (

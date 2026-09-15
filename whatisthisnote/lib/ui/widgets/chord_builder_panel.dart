@@ -15,17 +15,14 @@ import '../painters/chord_builder_painter.dart';
 class ChordBuilderPanel extends StatelessWidget {
   const ChordBuilderPanel({
     super.key,
+    this.sidebar = false,
     required this.notes,
     required this.selectedIndex,
-    required this.clef,
-    required this.keySignature,
     required this.matches,
     required this.selectedMatch,
     required this.maxNotes,
     required this.rootNoteFor,
     required this.onSelectNote,
-    required this.onAddNote,
-    required this.onMoveNote,
     required this.onAccidentalChanged,
     required this.onRemoveNote,
     required this.onShowSuggestions,
@@ -34,13 +31,16 @@ class ChordBuilderPanel extends StatelessWidget {
     required this.onPlayChord,
     required this.onPlayMatch,
     required this.onSelectMatch,
+    required this.onClearAll,
     required this.keySelector,
   });
 
+  /// Whether the panel sits in a full-height rail beside the staff instead of
+  /// below it.
+  final bool sidebar;
+
   final List<Note> notes;
   final int? selectedIndex;
-  final Clef clef;
-  final MusicalKey keySignature;
   final List<ChordMatch> matches;
 
   /// The chord the learner tapped, highlighted on the staff and in the list.
@@ -51,8 +51,6 @@ class ChordBuilderPanel extends StatelessWidget {
   final Note Function(int pitchClass) rootNoteFor;
 
   final ValueChanged<int> onSelectNote;
-  final ValueChanged<int> onAddNote;
-  final void Function(int index, int step) onMoveNote;
   final void Function(int index, Accidental accidental) onAccidentalChanged;
   final ValueChanged<int> onRemoveNote;
 
@@ -68,6 +66,9 @@ class ChordBuilderPanel extends StatelessWidget {
   final ValueChanged<ChordMatch> onPlayMatch;
   final ValueChanged<ChordMatch> onSelectMatch;
 
+  /// Removes every placed note.
+  final VoidCallback onClearAll;
+
   final Widget keySelector;
 
   @override
@@ -76,140 +77,146 @@ class ChordBuilderPanel extends StatelessWidget {
     final selected = selectedIndex != null && selectedIndex! < notes.length
         ? notes[selectedIndex!]
         : null;
-    final highlighted = selectedMatch?.pitchClasses ?? const <int>{};
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          keySelector,
-          const SizedBox(height: 12),
-          Text('Build a chord', style: theme.textTheme.titleMedium),
-          Text(
-            'Tap the staff to add a note, then drag it or use the arrows. '
-            'Tap a chord below to highlight its notes.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 180,
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: ChordStaff(
-              clef: clef,
-              keySignature: keySignature,
-              notes: notes,
-              selectedIndex: selectedIndex,
-              highlightPitchClasses: highlighted,
-              maxNotes: maxNotes,
-              onSelect: onSelectNote,
-              onAdd: onAddNote,
-              onMove: onMoveNote,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: notes.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 6),
-              itemBuilder: (context, index) => InputChip(
-                key: Key('builder-note-$index'),
-                label: Text(notes[index].name),
-                selected: index == selectedIndex,
-                onPressed: () => onSelectNote(index),
-                onDeleted: () => onRemoveNote(index),
-                deleteIcon: const Icon(Icons.close, size: 16),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  key: const Key('builder-add'),
-                  onPressed: notes.length < maxNotes ? onShowSuggestions : null,
-                  icon: const Icon(Icons.arrow_upward, size: 18),
-                  label: const Text('Add above'),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        // On phones the staff above keeps the larger share; the panel scrolls
+        // itself so the notation is never squeezed.
+        maxHeight: sidebar
+            ? double.infinity
+            : MediaQuery.sizeOf(context).height * 0.5,
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            keySelector,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Build a chord',
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  key: const Key('builder-add-below'),
-                  onPressed: notes.length < maxNotes ? onAddBelow : null,
-                  icon: const Icon(Icons.arrow_downward, size: 18),
-                  label: const Text('Add below'),
+                TextButton.icon(
+                  key: const Key('builder-clear'),
+                  onPressed: notes.isEmpty ? null : onClearAll,
+                  icon: const Icon(Icons.clear_all, size: 18),
+                  label: const Text('Clear all'),
                 ),
+              ],
+            ),
+            Text(
+              'Tap the staff to add a note, then drag it or use the arrows. '
+              'Tap a chord below to highlight its notes.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: SegmentedButton<Accidental>(
-              key: const Key('builder-accidental'),
-              showSelectedIcon: false,
-              segments: [
-                for (final accidental in Accidental.values)
-                  ButtonSegment<Accidental>(
-                    value: accidental,
-                    label: Text(accidental.text),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var index = 0; index < notes.length; index++)
+                  InputChip(
+                    key: Key('builder-note-$index'),
+                    label: Text(notes[index].name),
+                    selected: index == selectedIndex,
+                    onPressed: () => onSelectNote(index),
+                    onDeleted: () => onRemoveNote(index),
+                    deleteIcon: const Icon(Icons.close, size: 16),
                   ),
               ],
-              selected: {selected?.accidental ?? Accidental.natural},
-              onSelectionChanged: selected == null
-                  ? null
-                  : (selection) =>
-                        onAccidentalChanged(selectedIndex!, selection.first),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${notes.length} of $maxNotes notes',
-                  key: const Key('builder-count'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    key: const Key('builder-add'),
+                    onPressed: notes.length < maxNotes
+                        ? onShowSuggestions
+                        : null,
+                    icon: const Icon(Icons.arrow_upward, size: 18),
+                    label: const Text('Add above'),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    key: const Key('builder-add-below'),
+                    onPressed: notes.length < maxNotes ? onAddBelow : null,
+                    icon: const Icon(Icons.arrow_downward, size: 18),
+                    label: const Text('Add below'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SegmentedButton<Accidental>(
+                key: const Key('builder-accidental'),
+                showSelectedIcon: false,
+                segments: [
+                  for (final accidental in Accidental.values)
+                    ButtonSegment<Accidental>(
+                      value: accidental,
+                      label: Text(accidental.text),
+                    ),
+                ],
+                selected: {selected?.accidental ?? Accidental.natural},
+                onSelectionChanged: selected == null
+                    ? null
+                    : (selection) =>
+                          onAccidentalChanged(selectedIndex!, selection.first),
               ),
-              IconButton(
-                key: const Key('builder-up'),
-                tooltip: 'Move the selected note up',
-                onPressed: selected == null ? null : () => onNudgeSelected(1),
-                icon: const Icon(Icons.keyboard_arrow_up),
-              ),
-              IconButton(
-                key: const Key('builder-down'),
-                tooltip: 'Move the selected note down',
-                onPressed: selected == null ? null : () => onNudgeSelected(-1),
-                icon: const Icon(Icons.keyboard_arrow_down),
-              ),
-              const SizedBox(width: 4),
-              FilledButton.tonalIcon(
-                key: const Key('builder-play'),
-                onPressed: notes.length >= 2 ? onPlayChord : null,
-                icon: const Icon(Icons.volume_up),
-                label: const Text('Play'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text('Possible chords', style: theme.textTheme.titleSmall),
-          const SizedBox(height: 4),
-          _matchList(context),
-        ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${notes.length} of $maxNotes notes',
+                    key: const Key('builder-count'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('builder-up'),
+                  tooltip: 'Move the selected note up',
+                  onPressed: selected == null ? null : () => onNudgeSelected(1),
+                  icon: const Icon(Icons.keyboard_arrow_up),
+                ),
+                IconButton(
+                  key: const Key('builder-down'),
+                  tooltip: 'Move the selected note down',
+                  onPressed: selected == null
+                      ? null
+                      : () => onNudgeSelected(-1),
+                  icon: const Icon(Icons.keyboard_arrow_down),
+                ),
+                const SizedBox(width: 4),
+                FilledButton.tonalIcon(
+                  key: const Key('builder-play'),
+                  onPressed: notes.length >= 2 ? onPlayChord : null,
+                  icon: const Icon(Icons.volume_up),
+                  label: const Text('Play'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Possible chords', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            _matchList(context),
+          ],
+        ),
       ),
     );
   }
@@ -495,6 +502,8 @@ class ChordStaff extends StatefulWidget {
 
 class _ChordStaffState extends State<ChordStaff> {
   int? _dragIndex;
+  int? _dragStartStep;
+  double _dragStartY = 0;
 
   int _stepAt(StaffGeometry geometry, double y) =>
       geometry.clampStep(geometry.stepForY(y).round()).round();
@@ -512,7 +521,7 @@ class _ChordStaffState extends State<ChordStaff> {
         best = index;
       }
     }
-    return bestDistance <= geometry.halfSpace * 1.1 ? best : null;
+    return bestDistance <= geometry.halfSpace * 1.4 ? best : null;
   }
 
   void _handleTap(StaffGeometry geometry, Offset position) {
@@ -525,19 +534,39 @@ class _ChordStaffState extends State<ChordStaff> {
     widget.onAdd(_stepAt(geometry, position.dy));
   }
 
+  /// Starts dragging the note under the finger, or the selected note when the
+  /// finger is away from any notehead, so the whole staff is a grab target.
   void _handleDragStart(StaffGeometry geometry, Offset position) {
-    final index = _nearestIndex(geometry, position.dy);
+    final nearest = _nearestIndex(geometry, position.dy);
+    final index = nearest ?? widget.selectedIndex;
+    if (index == null || index >= widget.notes.length) {
+      _dragIndex = null;
+      return;
+    }
     _dragIndex = index;
-    if (index != null) widget.onSelect(index);
+    _dragStartStep = widget.clef.stepOf(widget.notes[index]);
+    _dragStartY = position.dy;
+    if (nearest != null) widget.onSelect(nearest);
   }
 
+  /// Moves the dragged note by whole steps relative to where the drag began,
+  /// so a note grabbed anywhere keeps its shape instead of jumping to the
+  /// finger.
   void _handleDragUpdate(StaffGeometry geometry, Offset position) {
     final index = _dragIndex;
-    if (index == null || index >= widget.notes.length) return;
-    final step = _stepAt(geometry, position.dy);
+    final start = _dragStartStep;
+    if (index == null || start == null || index >= widget.notes.length) return;
+    final deltaSteps = ((_dragStartY - position.dy) / geometry.halfSpace)
+        .round();
+    final step = geometry.clampStep(start + deltaSteps).round();
     if (step != widget.clef.stepOf(widget.notes[index])) {
       widget.onMove(index, step);
     }
+  }
+
+  void _handleDragEnd() {
+    _dragIndex = null;
+    _dragStartStep = null;
   }
 
   @override
@@ -555,7 +584,8 @@ class _ChordStaffState extends State<ChordStaff> {
               _handleDragStart(geometry, details.localPosition),
           onVerticalDragUpdate: (details) =>
               _handleDragUpdate(geometry, details.localPosition),
-          onVerticalDragEnd: (_) => _dragIndex = null,
+          onVerticalDragEnd: (_) => _handleDragEnd(),
+          onVerticalDragCancel: _handleDragEnd,
           child: Semantics(
             label: 'Chord staff',
             hint: 'Tap to add a note, drag a note up or down to change it.',

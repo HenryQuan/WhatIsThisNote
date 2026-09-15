@@ -248,19 +248,36 @@ class _HomePageState extends State<HomePage> {
       return KeyEventResult.ignored;
     }
     if (_focusIsInteractive()) return KeyEventResult.ignored;
-    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _stopSequence();
-      _setStep(_step + 1);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      _stopSequence();
-      _setStep(_step - 1);
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.space) {
-      _playNow();
-      return KeyEventResult.handled;
+    // Only the Note and Chords tabs drive the staff from the keyboard; the
+    // other destinations ignore the arrow keys and space bar.
+    if (_tab == _HomeTab.note) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        _stopSequence();
+        _setStep(_step + 1);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        _stopSequence();
+        _setStep(_step - 1);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.space) {
+        _playNow();
+        return KeyEventResult.handled;
+      }
+    } else if (_tab == _HomeTab.chords) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        _nudgeBuilderNote(1);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        _nudgeBuilderNote(-1);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.space) {
+        if (_builderNotes.isNotEmpty) _playBuilderChord();
+        return KeyEventResult.handled;
+      }
     }
     return KeyEventResult.ignored;
   }
@@ -994,6 +1011,28 @@ class _HomePageState extends State<HomePage> {
     return lowest.midi % 12;
   }
 
+  /// Clears every note from the custom chord builder.
+  void _clearBuilderNotes() {
+    if (_builderNotes.isEmpty) return;
+    setState(() {
+      _builderNotes.clear();
+      _builderSelected = null;
+      _builderMatch = null;
+    });
+  }
+
+  /// Folds a note's MIDI into the keyboard's C4-C5 range so the chord shows on
+  /// the one-octave keyboard. A C in the upper octave lights the upper C.
+  static int _keyboardMidiFor(int midi) {
+    final pitchClass = midi % 12;
+    if (pitchClass != 0) return 60 + pitchClass;
+    return midi >= 72 ? 72 : 60;
+  }
+
+  /// Whether [note] is a C that the keyboard should place on its upper C key.
+  static bool _isUpperOctaveC(Note? note) =>
+      note != null && note.midi % 12 == 0 && note.midi >= 72;
+
   /// Spells a root pitch class, preferring a note the learner placed and
   /// falling back to a sharp spelling.
   Note _builderRootNote(int pitchClass) {
@@ -1132,6 +1171,45 @@ class _HomePageState extends State<HomePage> {
                 ],
               );
 
+              final selectedBuilderNote =
+                  _builderSelected != null &&
+                      _builderSelected! < _builderNotes.length
+                  ? _builderNotes[_builderSelected!]
+                  : (_builderNotes.isNotEmpty ? _builderNotes.first : null);
+
+              final chordStaff = Column(
+                children: [
+                  Expanded(
+                    child: ChordStaff(
+                      clef: _clef,
+                      keySignature: _key,
+                      notes: _builderNotes,
+                      selectedIndex: _builderSelected,
+                      highlightPitchClasses:
+                          _builderMatch?.pitchClasses ?? const <int>{},
+                      maxNotes: _maxBuilderNotes,
+                      onSelect: (index) =>
+                          setState(() => _builderSelected = index),
+                      onAdd: _addBuilderNote,
+                      onMove: _moveBuilderNote,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: PianoKeyboard(
+                      key: const Key('chord-keyboard'),
+                      midi: selectedBuilderNote?.midi ?? 60,
+                      midiUpperOctave: _isUpperOctaveC(selectedBuilderNote),
+                      chordMidis: {
+                        for (final note in _builderNotes)
+                          _keyboardMidiFor(note.midi),
+                      },
+                      height: 64,
+                    ),
+                  ),
+                ],
+              );
+
               final panel = switch (_tab) {
                 _HomeTab.note => _Controls(
                   key: const Key('controls'),
@@ -1256,18 +1334,15 @@ class _HomePageState extends State<HomePage> {
                   onSweep: _sweepRegister,
                 ),
                 _HomeTab.chords => ChordBuilderPanel(
+                  sidebar: sidebar,
                   notes: _builderNotes,
                   selectedIndex: _builderSelected,
-                  clef: _clef,
-                  keySignature: _key,
                   matches: _builderMatches(),
                   selectedMatch: _builderMatch,
                   maxNotes: _maxBuilderNotes,
                   rootNoteFor: _builderRootNote,
                   onSelectNote: (index) =>
                       setState(() => _builderSelected = index),
-                  onAddNote: _addBuilderNote,
-                  onMoveNote: _moveBuilderNote,
                   onAccidentalChanged: _setBuilderAccidental,
                   onRemoveNote: _removeBuilderNote,
                   onShowSuggestions: _addBuilderNoteAbove,
@@ -1276,6 +1351,7 @@ class _HomePageState extends State<HomePage> {
                   onPlayChord: _playBuilderChord,
                   onPlayMatch: _playBuilderMatch,
                   onSelectMatch: _selectBuilderMatch,
+                  onClearAll: _clearBuilderNotes,
                   keySelector: _KeySelector(
                     value: _key,
                     onChanged: (key) => setState(() => _key = key),
@@ -1289,52 +1365,57 @@ class _HomePageState extends State<HomePage> {
                 ),
               };
 
-              if (_tab == _HomeTab.metronome ||
-                  _tab == _HomeTab.chords ||
-                  _tab == _HomeTab.about) {
+              if (_tab == _HomeTab.metronome || _tab == _HomeTab.about) {
                 return _withNavigation(constraints.maxWidth, panel);
               }
 
-              if (!sidebar || modePanel) {
+              // The Note and Chords tabs share the same two layouts: a staff
+              // on top with the controls below on phones, and a staff beside a
+              // resizable controls rail on tablets. Practice stays stacked so
+              // its mode switch keeps the full width.
+              final main = _tab == _HomeTab.chords ? chordStaff : staff;
+              if (_tab == _HomeTab.practice || !sidebar) {
                 return _withNavigation(
                   constraints.maxWidth,
                   Column(
                     children: [
                       if (modePanel) _practiceModeToggle,
-                      Expanded(child: staff),
+                      Expanded(child: main),
                       panel,
                     ],
                   ),
                 );
               }
 
-              final maxSidebarWidth = (constraints.maxWidth - 420).clamp(
-                320.0,
-                820.0,
-              );
-              final sidebarWidth = _sidebarWidth.clamp(280.0, maxSidebarWidth);
-
-              return _withNavigation(
-                constraints.maxWidth,
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(child: staff),
-                    _SidebarResizer(
-                      onDrag: (dx) => setState(() {
-                        _sidebarWidth = (_sidebarWidth - dx).clamp(
-                          280.0,
-                          maxSidebarWidth,
-                        );
-                      }),
-                    ),
-                    SizedBox(width: sidebarWidth, child: panel),
-                  ],
-                ),
-              );
+              return _staffWithPanel(constraints.maxWidth, main, panel);
             },
           ),
         ),
+      ),
+    );
+  }
+
+  /// Puts [main] (a staff) beside [panel] with the draggable divider, the
+  /// tablet layout shared by the Note and Chords tabs.
+  Widget _staffWithPanel(double width, Widget main, Widget panel) {
+    final maxSidebarWidth = (width - 420).clamp(320.0, 820.0);
+    final sidebarWidth = _sidebarWidth.clamp(280.0, maxSidebarWidth);
+    return _withNavigation(
+      width,
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: main),
+          _SidebarResizer(
+            onDrag: (dx) => setState(() {
+              _sidebarWidth = (_sidebarWidth - dx).clamp(
+                280.0,
+                maxSidebarWidth,
+              );
+            }),
+          ),
+          SizedBox(width: sidebarWidth, child: panel),
+        ],
       ),
     );
   }

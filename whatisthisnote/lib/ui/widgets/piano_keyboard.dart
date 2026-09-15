@@ -14,6 +14,8 @@ class PianoKeyboard extends StatelessWidget {
     this.label,
     this.highlightPitchClasses,
     this.chordPitchClasses,
+    this.chordMidis,
+    this.midiUpperOctave = false,
     this.playingPitchClass,
     this.playingUpperOctave = false,
     this.height = 54,
@@ -32,6 +34,15 @@ class PianoKeyboard extends StatelessWidget {
 
   /// Pitch classes (0 == C) of the current chord, tinted a third colour.
   final Set<int>? chordPitchClasses;
+
+  /// Exact MIDI notes of the current chord, tinted a third colour. Takes
+  /// precedence over [chordPitchClasses] so an upper-octave C lights the upper
+  /// C key instead of the lower one. The keyboard spans C4-C5 (MIDI 60-72).
+  final Set<int>? chordMidis;
+
+  /// Whether [midi]'s key is the upper of the keyboard's two C keys, used when
+  /// the highlighted note is a C in the upper octave.
+  final bool midiUpperOctave;
 
   /// Pitch class (0 == C) of the note that is currently sounding while a
   /// sequence plays, or `null` when nothing is playing.
@@ -61,8 +72,10 @@ class PianoKeyboard extends StatelessWidget {
         midi: midi,
         label: label,
         showHighlight: showHighlight,
+        midiUpperOctave: midiUpperOctave,
         highlightPitchClasses: highlightPitchClasses,
         chordPitchClasses: chordPitchClasses,
+        chordMidis: chordMidis,
         playingPitchClass: playingPitchClass,
         playingUpperOctave: playingUpperOctave,
         whiteColor: scheme.surfaceContainerLowest,
@@ -119,8 +132,10 @@ class _PianoKeyboardPainter extends CustomPainter {
     required this.midi,
     required this.label,
     required this.showHighlight,
+    required this.midiUpperOctave,
     required this.highlightPitchClasses,
     required this.chordPitchClasses,
+    required this.chordMidis,
     required this.playingPitchClass,
     required this.playingUpperOctave,
     required this.whiteColor,
@@ -140,8 +155,10 @@ class _PianoKeyboardPainter extends CustomPainter {
   final int midi;
   final String? label;
   final bool showHighlight;
+  final bool midiUpperOctave;
   final Set<int>? highlightPitchClasses;
   final Set<int>? chordPitchClasses;
+  final Set<int>? chordMidis;
   final int? playingPitchClass;
   final bool playingUpperOctave;
   final Color whiteColor;
@@ -181,6 +198,12 @@ class _PianoKeyboardPainter extends CustomPainter {
   /// Pitch class of each of the eight white keys (C to the next C).
   static const List<int> _whitePitchClasses = [0, 2, 4, 5, 7, 9, 11, 0];
 
+  /// Semitone offset of each white key from the keyboard's lower C.
+  static const List<int> _whiteOffsets = [0, 2, 4, 5, 7, 9, 11, 12];
+
+  /// MIDI number of the keyboard's lower C (C4); it spans C4-C5 (60-72).
+  static const int _baseMidi = 60;
+
   /// Pitch class of the key under [point] in a keyboard of [size], using the
   /// same layout as [paint]. Black keys take precedence where they overlap a
   /// white key.
@@ -213,7 +236,9 @@ class _PianoKeyboardPainter extends CustomPainter {
     final isBlack = _blackPitchClasses.contains(pitchClass);
     final whiteIndexOfHighlight = isBlack
         ? _blackAfterWhite[pitchClass]
-        : _whiteIndex[pitchClass];
+        : (pitchClass == 0 && midiUpperOctave
+              ? whiteCount - 1
+              : _whiteIndex[pitchClass]);
 
     final border = Paint()
       ..color = borderColor
@@ -228,10 +253,18 @@ class _PianoKeyboardPainter extends CustomPainter {
         size.height,
       ).deflate(0.5);
       final whitePitchClass = _whitePitchClasses[i];
+      // The last white key is the octave C: it shares pitch class 0 with the
+      // first key, so a pitch-class tint must not light both of them.
+      final isUpperC = i == whiteCount - 1;
       final highlighted =
           showHighlight && !isBlack && i == whiteIndexOfHighlight;
-      final tinted = highlightPitchClasses?.contains(whitePitchClass) ?? false;
-      final inChord = chordPitchClasses?.contains(whitePitchClass) ?? false;
+      final tinted =
+          !isUpperC &&
+          (highlightPitchClasses?.contains(whitePitchClass) ?? false);
+      final inChord = chordMidis != null
+          ? chordMidis!.contains(_baseMidi + _whiteOffsets[i])
+          : !isUpperC &&
+                (chordPitchClasses?.contains(whitePitchClass) ?? false);
       final playing =
           playingPitchClass == whitePitchClass &&
           (whitePitchClass != 0 || (i == 7) == playingUpperOctave);
@@ -264,7 +297,9 @@ class _PianoKeyboardPainter extends CustomPainter {
       );
       final highlighted = showHighlight && isBlack && entry.key == pitchClass;
       final tinted = highlightPitchClasses?.contains(entry.key) ?? false;
-      final inChord = chordPitchClasses?.contains(entry.key) ?? false;
+      final inChord = chordMidis != null
+          ? chordMidis!.contains(_baseMidi + entry.key)
+          : (chordPitchClasses?.contains(entry.key) ?? false);
       final playing = playingPitchClass == entry.key;
       final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(3));
       canvas.drawRRect(
@@ -312,8 +347,10 @@ class _PianoKeyboardPainter extends CustomPainter {
     return old.midi != midi ||
         old.label != label ||
         old.showHighlight != showHighlight ||
+        old.midiUpperOctave != midiUpperOctave ||
         !setEquals(old.highlightPitchClasses, highlightPitchClasses) ||
         !setEquals(old.chordPitchClasses, chordPitchClasses) ||
+        !setEquals(old.chordMidis, chordMidis) ||
         old.playingPitchClass != playingPitchClass ||
         old.playingUpperOctave != playingUpperOctave ||
         old.whiteColor != whiteColor ||
