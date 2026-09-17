@@ -86,8 +86,7 @@ class Note implements Comparable<Note> {
   /// for natural notes (and for the rare note with no single-accidental twin).
   Note? get enharmonic {
     if (accidental == Accidental.natural) return null;
-    final twinIndex =
-        diatonicIndex + (accidental == Accidental.sharp ? 1 : -1);
+    final twinIndex = diatonicIndex + (accidental.offset > 0 ? 1 : -1);
     final naturalTwin = Note(twinIndex);
     final difference = midi - naturalTwin.midi;
     if (difference == 0) return naturalTwin;
@@ -99,8 +98,7 @@ class Note implements Comparable<Note> {
   String? get enharmonicName => enharmonic?.name;
 
   /// Returns a copy of this note with the given [accidental].
-  Note withAccidental(Accidental accidental) =>
-      Note(diatonicIndex, accidental);
+  Note withAccidental(Accidental accidental) => Note(diatonicIndex, accidental);
 
   /// Returns a copy transposed by [steps] diatonic steps, keeping the
   /// accidental.

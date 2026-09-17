@@ -58,7 +58,8 @@ DeepSeek has implemented everything after 7 years in one afternoon. I am shocked
 
 The chord lab works from the note's scale degree and only builds chords on
 seven-note scales; it falls back to the key's major or natural minor scale and
-shows no chord for chromatic notes. The play button sounds the written note,
+transforms notes outside that scale into a clearly labeled chromatic chord. The
+play button sounds the written note,
 or the chord's tones when the chord lab is on. Tones are synthesized in Dart
 and played through `audioplayers`, which works on Android, iOS, web, Windows,
 macOS and Linux. A progression is selected and tapped, then played as a

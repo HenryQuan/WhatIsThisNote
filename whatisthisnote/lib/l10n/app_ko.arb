@@ -62,6 +62,13 @@
   "keySignature": "조표",
   "major": "장조",
   "minor": "단조",
+  "keyDisplayName": "{tonic} {mode}",
+  "@keyDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "mode": { "type": "String" }
+    }
+  },
   "keyMenuLabel": "조: {key}",
   "scaleHighlight": "음계 강조",
   "highlightLabel": "강조: {label}",
@@ -162,6 +169,13 @@
 
   "scaleMajor": "장음계",
   "scaleNaturalMinor": "자연단음계",
+  "scaleDisplayName": "{tonic} {scale}",
+  "@scaleDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "scale": { "type": "String" }
+    }
+  },
   "scaleHarmonicMinor": "화성단음계",
   "scaleMelodicMinor": "가락단음계",
   "scaleMajorPentatonic": "장 펜타토닉",

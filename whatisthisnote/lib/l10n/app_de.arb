@@ -62,6 +62,13 @@
   "keySignature": "Vorzeichen",
   "major": "Dur",
   "minor": "Moll",
+  "keyDisplayName": "{tonic} {mode}",
+  "@keyDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "mode": { "type": "String" }
+    }
+  },
   "keyMenuLabel": "Tonart: {key}",
   "scaleHighlight": "Tonleiter zeigen",
   "highlightLabel": "Hervorhebung: {label}",
@@ -162,6 +169,13 @@
 
   "scaleMajor": "Dur",
   "scaleNaturalMinor": "Natürliches Moll",
+  "scaleDisplayName": "{tonic} {scale}",
+  "@scaleDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "scale": { "type": "String" }
+    }
+  },
   "scaleHarmonicMinor": "Harmonisches Moll",
   "scaleMelodicMinor": "Melodisches Moll",
   "scaleMajorPentatonic": "Dur-Pentatonik",

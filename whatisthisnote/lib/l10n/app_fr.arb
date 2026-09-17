@@ -62,6 +62,13 @@
   "keySignature": "Armure",
   "major": "Majeur",
   "minor": "Mineur",
+  "keyDisplayName": "{tonic} {mode}",
+  "@keyDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "mode": { "type": "String" }
+    }
+  },
   "keyMenuLabel": "Tonalité : {key}",
   "scaleHighlight": "Surligner la gamme",
   "highlightLabel": "Surbrillance : {label}",
@@ -162,6 +169,13 @@
 
   "scaleMajor": "Majeur",
   "scaleNaturalMinor": "Mineur naturel",
+  "scaleDisplayName": "{tonic} {scale}",
+  "@scaleDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "scale": { "type": "String" }
+    }
+  },
   "scaleHarmonicMinor": "Mineur harmonique",
   "scaleMelodicMinor": "Mineur mélodique",
   "scaleMajorPentatonic": "Pentatonique majeur",

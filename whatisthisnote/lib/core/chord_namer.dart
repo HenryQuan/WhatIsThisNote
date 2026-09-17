@@ -95,9 +95,13 @@ ChordTone _addedTone(Note note, Note root) {
   var offset = (interval - _majorScaleSemitones[step]) % 12;
   if (offset > 6) offset -= 12;
   final accidental = offset < 0
-      ? '\u266D'
+      ? offset == -2
+            ? '\u{1D12B}'
+            : '\u266D'
       : offset > 0
-      ? '\u266F'
+      ? offset == 2
+            ? '\u{1D12A}'
+            : '\u266F'
       : '';
   return ChordTone(
     noteName: note.pitchName,

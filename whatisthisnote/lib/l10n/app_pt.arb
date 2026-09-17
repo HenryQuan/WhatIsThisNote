@@ -62,6 +62,13 @@
   "keySignature": "Armadura de clave",
   "major": "Maior",
   "minor": "Menor",
+  "keyDisplayName": "{tonic} {mode}",
+  "@keyDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "mode": { "type": "String" }
+    }
+  },
   "keyMenuLabel": "Tom: {key}",
   "scaleHighlight": "Destaque da escala",
   "highlightLabel": "Destaque: {label}",
@@ -156,6 +163,13 @@
   "clefName": "{clef}",
   "scaleMajor": "Maior",
   "scaleNaturalMinor": "Menor natural",
+  "scaleDisplayName": "{tonic} {scale}",
+  "@scaleDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "scale": { "type": "String" }
+    }
+  },
   "scaleHarmonicMinor": "Menor harmônica",
   "scaleMelodicMinor": "Menor melódica",
   "scaleMajorPentatonic": "Pentatônica maior",

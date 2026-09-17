@@ -62,6 +62,13 @@
   "keySignature": "調号",
   "major": "長調",
   "minor": "短調",
+  "keyDisplayName": "{tonic}{mode}",
+  "@keyDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "mode": { "type": "String" }
+    }
+  },
   "keyMenuLabel": "調: {key}",
   "scaleHighlight": "スケール表示",
   "highlightLabel": "ハイライト: {label}",
@@ -162,6 +169,13 @@
 
   "scaleMajor": "長音階",
   "scaleNaturalMinor": "自然短音階",
+  "scaleDisplayName": "{tonic}{scale}",
+  "@scaleDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "scale": { "type": "String" }
+    }
+  },
   "scaleHarmonicMinor": "和声短音階",
   "scaleMelodicMinor": "旋律短音階",
   "scaleMajorPentatonic": "メジャーペンタトニック",

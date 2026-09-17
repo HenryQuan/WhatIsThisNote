@@ -11,7 +11,6 @@ import 'package:whatisthisnote/core/clef.dart';
 import 'package:whatisthisnote/core/display_preferences.dart';
 import 'package:whatisthisnote/core/display_preferences_store.dart';
 import 'package:whatisthisnote/core/key.dart';
-import 'package:whatisthisnote/core/lesson.dart';
 import 'package:whatisthisnote/core/note.dart';
 import 'package:whatisthisnote/core/onboarding.dart';
 import 'package:whatisthisnote/core/quiz.dart';
@@ -103,6 +102,14 @@ void main() {
       expect(en.inversionShortLabel(1), '1st');
       expect(en.inversionShortLabel(2), '2nd');
       expect(en.inversionShortLabel(3), '3rd');
+    });
+
+    test('uses locale-owned templates for key and scale names', () {
+      final ja = lookupAppLocalizations(const Locale('ja'));
+      const key = MusicalKey('C', KeyMode.major, 0);
+      const scale = Scale('C', 0, ScaleType.major);
+      expect(ja.keyName(key), 'C長調');
+      expect(ja.scaleLabel(scale), 'C長音階');
     });
   });
 
@@ -478,6 +485,43 @@ void main() {
         11,
         13,
       ]);
+    });
+
+    test('voices altered chords with their written accidentals', () {
+      const aHarmonic = Scale('A', 9, ScaleType.harmonicMinor);
+      final dominant = Chord.diatonic(aHarmonic, 5);
+      expect(
+        dominant
+            .voicing(Note.fromLetter(NoteLetter.e, 4), 4)
+            .map((tone) => tone.note.name),
+        ['E4', 'G\u266F4', 'B4'],
+      );
+
+      final augmented = Chord.onNote(
+        Note.fromLetter(NoteLetter.c, 4),
+        ChordQuality.augmented,
+      );
+      expect(
+        augmented
+            .voicing(Note.fromLetter(NoteLetter.c, 4), 4)
+            .map((tone) => tone.note.name),
+        ['C4', 'E4', 'G\u266F4'],
+      );
+
+      final sharpAugmentedRoot = Note.fromLetter(
+        NoteLetter.c,
+        4,
+      ).withAccidental(Accidental.sharp);
+      final sharpAugmented = Chord.onNote(
+        sharpAugmentedRoot,
+        ChordQuality.augmented,
+      );
+      expect(
+        sharpAugmented
+            .voicing(sharpAugmentedRoot, 4)
+            .map((tone) => tone.note.name),
+        ['C\u266F4', 'E\u266F4', 'G\u{1D12A}4'],
+      );
     });
 
     test('builds the diatonic extended chords of a major key', () {

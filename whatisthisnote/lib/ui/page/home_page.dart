@@ -7,6 +7,7 @@ import '../../audio/note_player.dart';
 import '../../core/accidental.dart';
 import '../../core/chord.dart';
 import '../../core/chord_finder.dart';
+import '../../core/chord_service.dart';
 import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
@@ -224,7 +225,13 @@ class _HomePageState extends State<HomePage> {
     final note = _writtenNote;
     return _playSound(
       note,
-      _chordFor(_chordScale(scale), note),
+      ChordService.chordFor(
+        mode: _chordMode,
+        quality: _chordQuality,
+        scale: ChordService.scaleForChords(_key, scale),
+        note: note,
+        inversion: _inversion,
+      ),
       duration: duration,
     );
   }
@@ -284,19 +291,12 @@ class _HomePageState extends State<HomePage> {
     return KeyEventResult.ignored;
   }
 
-  /// The frequencies for the written [note], or [chord]'s tones when the
-  /// chord lab is on, voiced from the current staff position.
-  List<double> _frequenciesFor(Note note, Chord? chord) {
-    if (chord == null) return <double>[note.frequency];
-    return <double>[
-      for (final step in chord.staffSteps(_step))
-        _key.applyTo(_clef.noteAt(step)).frequency,
-    ];
-  }
-
   /// Plays the written [note], or [chord]'s tones when the chord lab is on.
   Future<void> _playSound(Note note, Chord? chord, {Duration? duration}) {
-    return _notePlayer.play(_frequenciesFor(note, chord), duration: duration);
+    final frequencies = chord == null
+        ? <double>[note.frequency]
+        : [for (final tone in chord.voicing(note, _step)) tone.note.frequency];
+    return _notePlayer.play(frequencies, duration: duration);
   }
 
   /// Stops any automatic playback and clears its highlight.
@@ -377,50 +377,6 @@ class _HomePageState extends State<HomePage> {
       ? null
       : Scale(_key.tonic, _key.tonicPitchClass, _scaleType!);
 
-  /// The seven-note scale used to build chords. Falls back to the key's major
-  /// or natural minor scale when the highlight set is not heptatonic.
-  Scale _chordScale(Scale? selected) {
-    if (selected != null && selected.isHeptatonic) return selected;
-    return Scale(
-      _key.tonic,
-      _key.tonicPitchClass,
-      _key.mode == KeyMode.major ? ScaleType.major : ScaleType.naturalMinor,
-    );
-  }
-
-  /// Numbered scale degree (1..7) of a written note, by letter.
-  static int _degreeOf(Note note, Scale scale) {
-    var relative = (note.letter.index - scale.tonicLetter.index) % 7;
-    if (relative < 0) relative += 7;
-    return relative + 1;
-  }
-
-  /// The chord built on [note] in [scale]: the diatonic chord when the note is
-  /// in the scale, and a chromatic transformation of it when the note lies
-  /// outside, so a transformed augmented or diminished shape still appears.
-  /// Returns `null` only when the chord lab is off.
-  Chord? _chordFor(Scale scale, Note note) {
-    if (_chordMode == ChordMode.off) return null;
-    final override = _chordQuality;
-    if (override != null) {
-      return Chord.onNote(note, override, inversion: _inversion);
-    }
-    if (scale.pitchClasses.contains(note.midi % 12)) {
-      return Chord.diatonic(
-        scale,
-        _degreeOf(note, scale),
-        extension: _chordMode.extension!,
-        inversion: _inversion,
-      );
-    }
-    return Chord.chromatic(
-      scale,
-      note,
-      extension: _chordMode.extension!,
-      inversion: _inversion,
-    );
-  }
-
   /// Selects a specific chord for the current root, or clears the override when
   /// the diatonic chord is wanted again.
   void _selectChordQuality(ChordQuality quality) {
@@ -455,9 +411,9 @@ class _HomePageState extends State<HomePage> {
   /// Moves the note to the nearest position with [degree] without touching
   /// playback, so the progression sequence can walk the chips.
   void _jumpToDegree(int degree) {
-    final scale = _chordScale(_selectedScale);
+    final scale = ChordService.scaleForChords(_key, _selectedScale);
     final note = _key.applyTo(_clef.noteAt(_step));
-    var delta = (degree - _degreeOf(note, scale)) % 7;
+    var delta = (degree - ChordService.degreeOf(note, scale)) % 7;
     if (delta > 3) delta -= 7;
     _setStep(_step + delta);
   }
@@ -1106,9 +1062,15 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final scale = _selectedScale;
-    final chordScale = _chordScale(scale);
+    final chordScale = ChordService.scaleForChords(_key, scale);
     final note = _writtenNote;
-    final chord = _chordFor(chordScale, note);
+    final chord = ChordService.chordFor(
+      mode: _chordMode,
+      quality: _chordQuality,
+      scale: chordScale,
+      note: note,
+      inversion: _inversion,
+    );
     final practiceActive = _tab == _HomeTab.practice && _practice;
     final guidedActive = _tab == _HomeTab.practice && _guided;
     final readActive = _tab == _HomeTab.practice && _read;
@@ -1150,6 +1112,9 @@ class _HomePageState extends State<HomePage> {
               // decides whether the destinations are a rail or a bottom bar.
               final sidebar = constraints.maxWidth >= 900;
               final modePanel = _tab == _HomeTab.practice;
+              final chordTones = readActive
+                  ? const <ChordToneAtStaff>[]
+                  : chord?.voicing(note, _step) ?? const <ChordToneAtStaff>[];
 
               final staff = Stack(
                 fit: StackFit.expand,
@@ -1158,9 +1123,7 @@ class _HomePageState extends State<HomePage> {
                     clef: _clef,
                     keySignature: _key,
                     step: _step,
-                    chordSteps: readActive
-                        ? const []
-                        : chord?.staffSteps(_step) ?? const [],
+                    chordTones: chordTones,
                     melodySteps: readActive
                         ? _melody?.steps ?? const []
                         : const [],

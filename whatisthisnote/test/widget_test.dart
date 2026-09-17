@@ -317,7 +317,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Dm(no5)'), findsOneWidget);
-    expect(find.textContaining('Missing: A (5th)'), findsWidgets);
+    expect(find.textContaining('Missing: A (5)'), findsWidgets);
     expect(
       tester
           .widget<PianoKeyboard>(find.byKey(const Key('chord-keyboard')))
@@ -616,12 +616,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('key-label')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('G major').last);
+    await tester.tap(find.text('G Major').last);
     await tester.pumpAndSettle();
 
     expect(
       tester.widget<Text>(find.byKey(const Key('key-label'))).data,
-      'Key: G major',
+      'Key: G Major',
     );
 
     // Move up four steps from the middle line (B4) to the F line (F5).
@@ -864,7 +864,7 @@ void main() {
     // but outside the highlight, so its diatonic chord is transformed.
     await tester.tap(find.byKey(const Key('key-label')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('C\u266F major').last);
+    await tester.tap(find.text('C\u266F Major').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('scale-label')));
@@ -1099,6 +1099,7 @@ void main() {
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const WhatIsThisNoteApp());
     await tester.pumpAndSettle();
 
@@ -1116,7 +1117,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('key-label')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('G major').last);
+    await tester.tap(find.text('G Major').last);
     await tester.pumpAndSettle();
 
     for (var i = 0; i < 10; i++) {
@@ -1128,8 +1129,6 @@ void main() {
       baseline,
       reason: 'changing the note resized the staff',
     );
-
-    await tester.binding.setSurfaceSize(null);
   });
 
   testWidgets('the guided path starts on the first lesson', (tester) async {
@@ -1198,6 +1197,9 @@ void main() {
   testWidgets('the staff writes an accidental outside the key', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
         home: Scaffold(
           body: Center(
             child: SizedBox(
@@ -1228,6 +1230,9 @@ void main() {
   testWidgets('the practice target carries its own accidental', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
         home: Scaffold(
           body: Center(
             child: SizedBox(
@@ -1558,7 +1563,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('key-label')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('G major').last);
+    await tester.tap(find.text('G Major').last);
     await tester.pumpAndSettle();
     for (var i = 0; i < 4; i++) {
       await tester.tap(find.byTooltip('Higher'));
@@ -1598,7 +1603,7 @@ void main() {
     // The same staff position in G major is F♯5, one glyph wider.
     await tester.tap(find.byKey(const Key('key-label')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('G major').last);
+    await tester.tap(find.text('G Major').last);
     await tester.pumpAndSettle();
     expect(
       tester.widget<Text>(find.byKey(const Key('note-name'))).data,

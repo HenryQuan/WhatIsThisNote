@@ -94,6 +94,13 @@
   "keySignature": "Key signature",
   "major": "Major",
   "minor": "Minor",
+  "keyDisplayName": "{tonic} {mode}",
+  "@keyDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "mode": { "type": "String" }
+    }
+  },
   "keyMenuLabel": "Key: {key}",
   "@keyMenuLabel": {
     "placeholders": {
@@ -300,6 +307,13 @@
 
   "scaleMajor": "Major",
   "scaleNaturalMinor": "Natural minor",
+  "scaleDisplayName": "{tonic} {scale}",
+  "@scaleDisplayName": {
+    "placeholders": {
+      "tonic": { "type": "String" },
+      "scale": { "type": "String" }
+    }
+  },
   "scaleHarmonicMinor": "Harmonic minor",
   "scaleMelodicMinor": "Melodic minor",
   "scaleMajorPentatonic": "Major pentatonic",

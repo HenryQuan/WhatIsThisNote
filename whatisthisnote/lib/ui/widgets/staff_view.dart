@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/accidental.dart';
+import '../../core/chord.dart';
 import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
@@ -11,7 +12,9 @@ import '../painters/notation_painter.dart';
 
 /// An interactive staff. The note can be dragged vertically to change its
 /// pitch; it snaps to the nearest staff position and animates into place.
-/// Dragging horizontally moves the note along the staff.
+/// Dragging horizontally moves the note along the staff. The widget must be
+/// placed below the app's [AppLocalizations] delegate because the staff label
+/// and accessibility text are localized.
 class StaffView extends StatefulWidget {
   const StaffView({
     super.key,
@@ -19,7 +22,7 @@ class StaffView extends StatefulWidget {
     required this.keySignature,
     required this.step,
     required this.onStepChanged,
-    this.chordSteps = const [],
+    this.chordTones = const [],
     this.targetStep,
     this.accidental,
     this.targetAccidental,
@@ -40,8 +43,12 @@ class StaffView extends StatefulWidget {
   /// The settled (integer) staff step.
   final int step;
 
-  /// Staff steps of an optional chord to draw around the note, low to high.
-  final List<int> chordSteps;
+  /// Exact tones of an optional chord to draw around the note, low to high.
+  final List<ChordToneAtStaff> chordTones;
+
+  /// Staff steps of [chordTones]. Kept as a small convenience for tests and
+  /// callers that only need the layout positions.
+  List<int> get chordSteps => [for (final tone in chordTones) tone.staffStep];
 
   /// Optional staff step to hint at, drawn as a hollow target notehead (used by
   /// the guided theory path).
@@ -268,7 +275,7 @@ class _StaffViewState extends State<StaffView>
               naming: widget.naming,
               showEnharmonic: widget.showEnharmonic,
               solfegeName: l10n.solfegeFor,
-              chordSteps: widget.chordSteps,
+              chordTones: widget.chordTones,
               chordColor: scheme.tertiary,
               targetStep: widget.targetStep,
               targetAccidental: widget.targetAccidental,

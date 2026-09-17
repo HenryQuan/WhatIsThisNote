@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/accidental.dart';
+import '../../core/chord.dart';
 import '../../core/clef.dart';
 import '../../core/display_preferences.dart';
 import '../../core/key.dart';
@@ -34,7 +35,7 @@ class NotationPainter extends CustomPainter {
     this.naming = NamingSystem.scientific,
     this.showEnharmonic = false,
     this.solfegeName = _defaultSolfegeName,
-    this.chordSteps = const [],
+    this.chordTones = const [],
     this.chordColor = const Color(0xFF000000),
     this.targetStep,
     this.targetColor,
@@ -71,8 +72,8 @@ class NotationPainter extends CustomPainter {
   /// is [NamingSystem.solfege].
   final String Function(Note note) solfegeName;
 
-  /// Staff steps of the current chord, low to high. Empty for a single note.
-  final List<int> chordSteps;
+  /// Exact tones of the current chord, low to high. Empty for a single note.
+  final List<ChordToneAtStaff> chordTones;
 
   /// Colour used for the chord tones other than the root.
   final Color chordColor;
@@ -102,7 +103,8 @@ class NotationPainter extends CustomPainter {
 
   /// Staff step the label describes: the lowest chord tone (the bass) when a
   /// chord is shown, otherwise the written note.
-  int get labelStep => chordSteps.isEmpty ? step.round() : chordSteps.first;
+  int get labelStep =>
+      chordTones.isEmpty ? step.round() : chordTones.first.staffStep;
 
   /// The note written at [step], taking the explicit [override] into account.
   Note _writtenNote(int step, Accidental? override) {
@@ -117,7 +119,8 @@ class NotationPainter extends CustomPainter {
 
   /// The note the label describes, including any explicit accidental.
   Note get _labelNote {
-    if (chordSteps.isEmpty && accidental != null) {
+    if (chordTones.isNotEmpty) return chordTones.first.note;
+    if (accidental != null) {
       return key.applyTo(clef.noteAt(labelStep)).withAccidental(accidental!);
     }
     return key.applyTo(clef.noteAt(labelStep));
@@ -161,7 +164,7 @@ class NotationPainter extends CustomPainter {
     }
     _paintLedgerLines(canvas, linePaint);
     _paintTarget(canvas);
-    if (chordSteps.isEmpty) {
+    if (chordTones.isEmpty) {
       _paintNote(canvas);
     } else {
       _paintChord(canvas);
@@ -259,7 +262,10 @@ class NotationPainter extends CustomPainter {
 
   void _paintLedgerLines(Canvas canvas, Paint paint) {
     final notes = <int>[
-      if (chordSteps.isEmpty) step.round() else ...chordSteps,
+      if (chordTones.isEmpty)
+        step.round()
+      else
+        ...chordTones.map((tone) => tone.staffStep),
       ?targetStep,
     ];
     final halfWidth = geometry.space * 0.95;
@@ -352,10 +358,8 @@ class NotationPainter extends CustomPainter {
   }
 
   void _paintChord(Canvas canvas) {
-    final rootStep = chordSteps.firstWhere(
-      (chordStep) => chordStep % 7 == step.round() % 7,
-      orElse: () => chordSteps.first,
-    );
+    final firstStep = chordTones.first.staffStep;
+    final lastStep = chordTones.last.staffStep;
     final headHalfWidth =
         _layoutGlyph(
           NotationGlyphs.noteheadBlack,
@@ -363,15 +367,15 @@ class NotationPainter extends CustomPainter {
           noteColor,
         ).width /
         2;
-    final stemUp = chordSteps.first < 4;
+    final stemUp = firstStep < 4;
     final stemLength = geometry.space * 3.5;
     final stemPaint = Paint()
       ..color = chordColor
       ..strokeWidth = (geometry.space * 0.12).clamp(1.2, 4.0)
       ..strokeCap = StrokeCap.round;
 
-    final lowest = geometry.yForStep(chordSteps.first);
-    final highest = geometry.yForStep(chordSteps.last);
+    final lowest = geometry.yForStep(firstStep);
+    final highest = geometry.yForStep(lastStep);
     final stemX = noteX + (stemUp ? headHalfWidth : -headHalfWidth);
     canvas.drawLine(
       Offset(stemX, stemUp ? lowest : highest),
@@ -379,18 +383,24 @@ class NotationPainter extends CustomPainter {
       stemPaint,
     );
 
-    for (final chordStep in chordSteps) {
+    for (final tone in chordTones) {
+      final chordStep = tone.staffStep;
       final notehead = _layoutGlyph(
         NotationGlyphs.noteheadBlack,
         geometry.space * 4,
-        chordStep == rootStep ? noteColor : chordColor,
+        tone.isRoot ? noteColor : chordColor,
       );
-      _paintGlyph(
-        canvas,
-        notehead,
-        centerX: noteX,
-        baselineY: geometry.yForStep(chordStep),
-      );
+      final noteY = geometry.yForStep(chordStep);
+      if (_needsAccidental(tone.note)) {
+        _paintAccidental(
+          canvas,
+          tone.note.accidental,
+          noteY,
+          noteX - notehead.width / 2,
+          tone.isRoot ? noteColor : chordColor,
+        );
+      }
+      _paintGlyph(canvas, notehead, centerX: noteX, baselineY: noteY);
     }
   }
 
@@ -470,7 +480,7 @@ class NotationPainter extends CustomPainter {
         old.showLabel != showLabel ||
         old.naming != naming ||
         old.showEnharmonic != showEnharmonic ||
-        !listEquals(old.chordSteps, chordSteps) ||
+        !listEquals(old.chordTones, chordTones) ||
         old.chordColor != chordColor ||
         old.targetStep != targetStep ||
         old.targetColor != targetColor ||

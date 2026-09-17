@@ -407,8 +407,10 @@ class ChordBuilderPanel extends StatelessWidget {
     );
   }
 
-  /// A beginner-facing hint for one added or omitted tone, e.g. `D (9th)`.
-  String _toneHint(ChordTone tone) => '${tone.noteName} (${tone.label})';
+  /// A beginner-facing hint for one added or omitted tone, e.g. `D (9)`.
+  /// Uses the compact music-theory token instead of the English ordinal stored
+  /// by the core matcher, so this hint remains language-neutral.
+  String _toneHint(ChordTone tone) => '${tone.noteName} (${tone.token})';
 
   /// Position of the bass note among a match's chord tones, or `null` when the
   /// bass is not a chord tone (an exact match always has one).
