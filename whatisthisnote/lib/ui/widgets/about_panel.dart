@@ -15,8 +15,8 @@ const String kEmail = 'the@tragichero.win';
 const String kBravuraUrl = 'https://github.com/steinbergmedia/bravura';
 
 /// The app's release version. Keep this in step with `version:` in pubspec.yaml
-/// (`0.3.0+1` means the displayed version here is `0.3`).
-const String kAppVersion = '0.3';
+/// (`0.4.0+1` means the displayed version here is `0.4`).
+const String kAppVersion = '0.4';
 
 /// Adds the bundled Bravura music font to the open-source license list.
 ///

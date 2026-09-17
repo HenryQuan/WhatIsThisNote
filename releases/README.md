@@ -6,6 +6,7 @@ in that version.
 
 | Version | Notes | Summary |
 | --- | --- | --- |
+| 0.4 | [0.4.md](0.4.md) | More correct chord spelling, consistent staff bounds and a cleaner contribution-friendly code structure. |
 | 0.3 | [0.3.md](0.3.md) | Localization: eight languages plus English, with a language picker. |
 | 0.2 | [0.2.md](0.2.md) | Accidentals outside the key in the guided theory path. |
 | 0.1 | [0.1.md](0.1.md) | First real release: note reading, practice, metronome, chord lab and builder. |

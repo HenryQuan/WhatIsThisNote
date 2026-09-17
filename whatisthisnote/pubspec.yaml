@@ -4,7 +4,7 @@ description: >-
   note names are shown in real time.
 publish_to: 'none'
 
-version: 0.3.0+1
+version: 0.4.0+1
 
 environment:
   sdk: ^3.12.0
