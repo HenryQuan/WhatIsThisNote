@@ -6,6 +6,7 @@ import '../../core/app_language.dart';
 import '../../core/display_preferences.dart';
 import '../../l10n/l10n.dart';
 import 'display_settings.dart';
+import 'section_heading.dart';
 
 /// Links shown in the About tab.
 const String kRepoUrl = 'https://github.com/HenryQuan/WhatIsThisNote';
@@ -108,14 +109,14 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              _Section(title: l10n.sectionDisplay),
+              SectionHeading(title: l10n.sectionDisplay),
               DisplaySettings(
                 preferences: display,
                 onChanged: onDisplayChanged,
               ),
               const SizedBox(height: 24),
 
-              _Section(title: l10n.sectionTheme),
+              SectionHeading(title: l10n.sectionTheme),
               const SizedBox(height: 8),
               SegmentedButton<ThemeMode>(
                 key: const Key('theme-mode'),
@@ -140,7 +141,7 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              _Section(title: l10n.sectionLanguage),
+              SectionHeading(title: l10n.sectionLanguage),
               const SizedBox(height: 8),
               _LanguagePicker(
                 value: display.language,
@@ -149,7 +150,7 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              _Section(title: l10n.sectionFeedback),
+              SectionHeading(title: l10n.sectionFeedback),
               const SizedBox(height: 8),
               Text(l10n.aboutFeedbackBody, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 8),
@@ -176,7 +177,7 @@ class AboutPanel extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              _Section(title: l10n.sectionOpenSource),
+              SectionHeading(title: l10n.sectionOpenSource),
               const SizedBox(height: 8),
               Text(l10n.aboutOpenSourceBody, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 8),
@@ -230,26 +231,6 @@ class _LanguagePicker extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-/// A small uppercase section heading, matching the control panels.
-class _Section extends StatelessWidget {
-  const _Section({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Text(
-      title.toUpperCase(),
-      style: theme.textTheme.labelSmall?.copyWith(
-        color: theme.colorScheme.primary,
-        letterSpacing: 1.2,
-        fontWeight: FontWeight.bold,
-      ),
     );
   }
 }
