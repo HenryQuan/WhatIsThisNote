@@ -215,7 +215,7 @@ class _HomePageState extends State<HomePage> {
   int _melodyToken = 0;
 
   void _setStep(int step) {
-    setState(() => _step = step.clamp(kMinStaffStep, kMaxStaffStep));
+    setState(() => _step = clampStaffStep(step));
   }
 
   /// Keeps state updates in the main State class while feature code lives in

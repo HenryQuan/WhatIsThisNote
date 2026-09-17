@@ -7,6 +7,16 @@ const int kMinStaffStep = -6;
 /// Highest staff step the user can drag to (three ledger lines above).
 const int kMaxStaffStep = 14;
 
+/// Clamps an integer staff position to the standard playable range.
+///
+/// Interactive staff controls should use this helper for whole-step changes
+/// so keyboard, buttons, taps and drags share the same boundary behaviour.
+int clampStaffStep(
+  int step, {
+  int minStep = kMinStaffStep,
+  int maxStep = kMaxStaffStep,
+}) => step.clamp(minStep, maxStep);
+
 /// Immutable geometry for a five line staff.
 ///
 /// Staff positions are measured in *steps*, where one step is half the
@@ -25,8 +35,7 @@ class StaffGeometry {
   /// Builds responsive geometry: the line spacing scales with the available
   /// height but is clamped so the staff stays readable on any screen.
   factory StaffGeometry.forSize(Size size) {
-    final space =
-        math.min(size.height / 15, size.width / 16).clamp(8.0, 40.0);
+    final space = math.min(size.height / 15, size.width / 16).clamp(8.0, 40.0);
     final margin = (size.width * 0.06).clamp(12.0, 64.0);
     return StaffGeometry(
       size: size,

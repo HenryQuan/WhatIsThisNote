@@ -1785,6 +1785,24 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
     expect(tester.widget<Text>(find.byKey(const Key('note-name'))).data, 'B4');
+
+    for (var i = 0; i < 40; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    }
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<StaffView>(find.byType(StaffView)).step,
+      kMaxStaffStep,
+    );
+
+    for (var i = 0; i < 40; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    }
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<StaffView>(find.byType(StaffView)).step,
+      kMinStaffStep,
+    );
   });
 
   testWidgets('reduce motion snaps the note without animating', (tester) async {
@@ -1873,6 +1891,48 @@ void main() {
     await tester.pump();
     expect(player.played, hasLength(1));
     expect(player.played.single, hasLength(2));
+  });
+
+  testWidgets('chord keyboard and dragging share staff boundaries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const WhatIsThisNoteApp());
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.byTooltip('Chords'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('builder-add')));
+    await tester.pumpAndSettle();
+
+    final staffFinder = find.byType(ChordStaff);
+    for (var i = 0; i < 40; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    }
+    await tester.pumpAndSettle();
+    var staff = tester.widget<ChordStaff>(staffFinder);
+    expect(staff.clef.stepOf(staff.notes.single), kMaxStaffStep);
+
+    await tester.drag(staffFinder, const Offset(0, -2000));
+    await tester.pumpAndSettle();
+    staff = tester.widget<ChordStaff>(staffFinder);
+    expect(staff.clef.stepOf(staff.notes.single), kMaxStaffStep);
+
+    for (var i = 0; i < 40; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    }
+    await tester.pumpAndSettle();
+    staff = tester.widget<ChordStaff>(staffFinder);
+    expect(staff.clef.stepOf(staff.notes.single), kMinStaffStep);
+
+    await tester.drag(staffFinder, const Offset(0, 2000));
+    await tester.pumpAndSettle();
+    staff = tester.widget<ChordStaff>(staffFinder);
+    expect(staff.clef.stepOf(staff.notes.single), kMinStaffStep);
   });
 
   testWidgets('a wide window packs the controls and grows the staff', (

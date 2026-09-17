@@ -184,6 +184,14 @@ void main() {
       expect(geometry.clampStep(-100), kMinStaffStep);
       expect(geometry.clampStep(100), kMaxStaffStep);
     });
+
+    test('clampStaffStep uses the same integer boundaries', () {
+      expect(clampStaffStep(-100), kMinStaffStep);
+      expect(clampStaffStep(100), kMaxStaffStep);
+      expect(clampStaffStep(4), 4);
+      expect(clampStaffStep(-100, minStep: -2, maxStep: 6), -2);
+      expect(clampStaffStep(100, minStep: -2, maxStep: 6), 6);
+    });
   });
 
   group('Key', () {

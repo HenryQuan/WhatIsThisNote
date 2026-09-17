@@ -5,7 +5,9 @@ extension _HomeBuilder on _HomePageState {
   /// also the suggested root.
   void _addBuilderNote(int step) {
     if (_builderNotes.length >= _maxBuilderNotes) return;
-    final note = _key.applyTo(_clef.noteAt(step));
+    final clampedStep = clampStaffStep(step);
+    if (clampedStep != step) return;
+    final note = _key.applyTo(_clef.noteAt(clampedStep));
     _update(() {
       _builderNotes.add(note);
       _builderSelected = _builderNotes.length - 1;
@@ -53,10 +55,12 @@ extension _HomeBuilder on _HomePageState {
 
   void _moveBuilderNote(int index, int step) {
     if (index < 0 || index >= _builderNotes.length) return;
+    final clampedStep = clampStaffStep(step);
     final note = _builderNotes[index];
+    if (_clef.stepOf(note) == clampedStep) return;
     _update(() {
       _builderNotes[index] = Note(
-        _clef.bottomLine.diatonicIndex + step,
+        _clef.bottomLine.diatonicIndex + clampedStep,
         note.accidental,
       );
       _builderMatch = null;

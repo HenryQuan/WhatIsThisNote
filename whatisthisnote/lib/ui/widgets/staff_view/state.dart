@@ -55,14 +55,22 @@ class _StaffViewState extends State<StaffView>
 
   /// Moves the note by [delta] staff steps, clamped to the allowed range.
   void _nudge(int delta) {
-    final target = (widget.step + delta).clamp(widget.minStep, widget.maxStep);
+    final target = clampStaffStep(
+      widget.step + delta,
+      minStep: widget.minStep,
+      maxStep: widget.maxStep,
+    );
     if (target != widget.step) widget.onStepChanged(target);
   }
 
   /// Scientific name of the note at [step], used for the semantics
   /// `increasedValue`/`decreasedValue` that assistive tech announces.
   String _semanticNameAt(int step) {
-    final clamped = step.clamp(widget.minStep, widget.maxStep);
+    final clamped = clampStaffStep(
+      step,
+      minStep: widget.minStep,
+      maxStep: widget.maxStep,
+    );
     var note = widget.keySignature.applyTo(widget.clef.noteAt(clamped));
     if (clamped == widget.step && widget.accidental != null) {
       note = note.withAccidental(widget.accidental!);
@@ -238,5 +246,3 @@ class _StaffViewState extends State<StaffView>
     );
   }
 }
-
-

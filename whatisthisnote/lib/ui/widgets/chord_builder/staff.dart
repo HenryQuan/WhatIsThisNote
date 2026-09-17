@@ -35,8 +35,11 @@ class _ChordStaffState extends State<ChordStaff> {
   int? _dragStartStep;
   double _dragStartY = 0;
 
-  int _stepAt(StaffGeometry geometry, double y) =>
-      geometry.clampStep(geometry.stepForY(y).round()).round();
+  int _stepAt(StaffGeometry geometry, double y) => clampStaffStep(
+    geometry.stepForY(y).round(),
+    minStep: geometry.minStep,
+    maxStep: geometry.maxStep,
+  );
 
   /// The placed note whose notehead is nearest [y], if the tap is close enough
   /// to one; otherwise `null` so the tap falls through to "add a note".
@@ -88,7 +91,11 @@ class _ChordStaffState extends State<ChordStaff> {
     if (index == null || start == null || index >= widget.notes.length) return;
     final deltaSteps = ((_dragStartY - position.dy) / geometry.halfSpace)
         .round();
-    final step = geometry.clampStep(start + deltaSteps).round();
+    final step = clampStaffStep(
+      start + deltaSteps,
+      minStep: geometry.minStep,
+      maxStep: geometry.maxStep,
+    );
     if (step != widget.clef.stepOf(widget.notes[index])) {
       widget.onMove(index, step);
     }
@@ -141,5 +148,3 @@ class _ChordStaffState extends State<ChordStaff> {
     );
   }
 }
-
-
